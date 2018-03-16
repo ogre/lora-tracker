@@ -151,7 +151,6 @@ volatile uint16_t gnss_string_len = 0;
 volatile uint16_t gnss_message_id = 0;
 volatile char* gnss_buff_ptr = &gnss_buff[0];
 
-volatile uint8_t time_updated = 0;
 volatile uint8_t pos_updated = 0;
 volatile uint8_t gnss_status_updated = 0;
 
@@ -752,7 +751,7 @@ int main(void)
 	{
 
 #ifndef ENABLE_GPS
-		time_updated = 1;
+		gnss_status_updated = 1;
 #endif
 
 		//calibrate_hsi();
