@@ -1164,6 +1164,10 @@ bool cmp_read_char(cmp_ctx_t *ctx, int8_t *c) {
         *c = obj.as.u8;
         return true;
       }
+      else {
+        ctx->error = INVALID_TYPE_ERROR;
+        return false;
+      }
     default:
       ctx->error = INVALID_TYPE_ERROR;
       return false;
@@ -1192,6 +1196,10 @@ bool cmp_read_short(cmp_ctx_t *ctx, int16_t *s) {
       if (obj.as.u16 <= 32767) {
         *s = obj.as.u16;
         return true;
+      }
+      else {
+        ctx->error = INVALID_TYPE_ERROR;
+        return false;
       }
     default:
       ctx->error = INVALID_TYPE_ERROR;
@@ -1227,6 +1235,10 @@ bool cmp_read_int(cmp_ctx_t *ctx, int32_t *i) {
       if (obj.as.u32 <= 2147483647) {
         *i = obj.as.u32;
         return true;
+      }
+      else {
+        ctx->error = INVALID_TYPE_ERROR;
+        return false;
       }
     default:
       ctx->error = INVALID_TYPE_ERROR;
@@ -1268,6 +1280,10 @@ bool cmp_read_long(cmp_ctx_t *ctx, int64_t *d) {
       if (obj.as.u64 <= 9223372036854775807) {
         *d = obj.as.u64;
         return true;
+      }
+      else {
+        ctx->error = INVALID_TYPE_ERROR;
+        return false;
       }
     default:
       ctx->error = INVALID_TYPE_ERROR;

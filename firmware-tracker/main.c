@@ -197,7 +197,7 @@ uint8_t diff_scaling_factor_alt = 1;
 	uint32_t current;
 #endif
 
-
+#ifdef HABPACK
 ///////// msgpack stuff
 //#define HB_BUF_LEN 100
 //uint8_t hb_buf[HB_BUF_LEN] = {0};
@@ -229,9 +229,10 @@ static size_t file_writer(cmp_ctx_t *ctx, const void *data, size_t count) {
 }
 
 /////////////////
+#endif
 
 
-uint16_t cal_get_period(void)
+static uint16_t cal_get_period(void)
 {
 	//measure ext clock
 	uint16_t c1,c2;
@@ -247,7 +248,7 @@ uint16_t cal_get_period(void)
 
 	while(((TIM14_SR & (1<<1))==0) && (ms_countdown>0));  //CC1IF
 	TIM14_SR |= (1<<1);
-	uint16_t c3 = TIM14_CCR1;
+	//uint16_t c3 = TIM14_CCR1;
 
 	if (ms_countdown == 0) //error condition
 		return 0;
@@ -367,7 +368,7 @@ void calibrate_hsi(void)
 
 }
 
-void init_wdt(void)
+static void init_wdt(void)
 {
 	RCC_CSR |= 1;   //LSI on
 	while(RCC_CSR&(1<<1));  //wait for LSI ready
@@ -500,7 +501,7 @@ void init (void)
 	usart_send_blocking(USART1,ubloxcrc>>8);
 	usart_send_blocking(USART1,ubloxcrc&0xFF);
 
-	ubloxcrc = calculate_ublox_crc(&enable_navpvt[2],16-4);
+	ubloxcrc = calculate_ublox_crc((uint8_t *)&enable_navpvt[2],16-4);
 	uart_send_blocking_len((uint8_t*)enable_navpvt,14);
 	usart_send_blocking(USART1,ubloxcrc>>8);
 	usart_send_blocking(USART1,ubloxcrc&0xFF);
@@ -510,11 +511,11 @@ void init (void)
 	//			GPIO2 | GPIO3);
 }
 
-void uart_send_blocking_len(uint8_t *buff, uint16_t len)
+void uart_send_blocking_len(uint8_t *_buff, uint16_t len)
 {
 	uint16_t i = 0;
 	for (i = 0; i < len; i++)
-		usart_send_blocking(USART1,*buff++);
+		usart_send_blocking(USART1,*_buff++);
 
 }
 
@@ -1119,65 +1120,65 @@ uint16_t process_packet(char* buffer, uint16_t len, uint8_t format)
 		k=0;
 #ifndef MULTI_POS
 		if  (format == 2)
-			k=7;//snprintf(&buff[k],len,"xxxxx");
+			k=7;//snprintf(&buffer[k],len,"xxxxx");
 #ifdef TESTING
-		k+=snprintf(&buff[k],len-k,"$$PAYIOAD,%u,",payload_counter++);
+		k+=snprintf(&buffer[k],len-k,"$$PAYIOAD,%u,",payload_counter++);
 #else
-		k+=snprintf(&buff[k],len-k,"$$%s,%u,",CALLSIGN_STR,payload_counter++);
+		k+=snprintf(&buffer[k],len-k,"$$%s,%u,",CALLSIGN_STR,payload_counter++);
 #endif
 		if (time_valid)
-			k+=snprintf(&buff[k],len-k,"%02u:%02u:%02u,",
+			k+=snprintf(&buffer[k],len-k,"%02u:%02u:%02u,",
 					_hour,_minute,_second);
 		else
-			k+=snprintf(&buff[k],len-k,",");
+			k+=snprintf(&buffer[k],len-k,",");
 
 		if (pos_valid)
-			k+=snprintf(&buff[k],len-k,"%ld,%ld,%d,%u",
+			k+=snprintf(&buffer[k],len-k,"%ld,%ld,%ld,%u",
 					_latitude,_longitude,_altitude,_sats);
 		else
-			k+=snprintf(&buff[k],len-k,",,,%u",
+			k+=snprintf(&buffer[k],len-k,",,,%u",
 					_sats);
 
-		k+=snprintf(&buff[k],len-k,",%u,%u",bv,uplink_counter);
+		k+=snprintf(&buffer[k],len-k,",%lu,%u",bv,uplink_counter);
 #ifdef CUTDOWN
-		k+=snprintf(&buff[k],len-k,",%u",cutdown_counter);
+		k+=snprintf(&buffer[k],len-k,",%u",cutdown_counter);
 		if (cutdown_status)
-			k+=snprintf(&buff[k],len-k,",OK");
+			k+=snprintf(&buffer[k],len-k,",OK");
 		else
-			k+=snprintf(&buff[k],len-k,",ERR");
+			k+=snprintf(&buffer[k],len-k,",ERR");
 #endif
 		uint16_t crc;
 
 		if (format == 2){
-			buff[0] = 0x55;
-			buff[1] = 0xAA;
-			buff[2] = 0x55;
-			buff[3] = 0x80;
-			buff[4] = 0x80;
-			buff[5] = 0x80;
-			buff[6] = 0x80;
-			crc = calculate_crc16(&buff[9]);
+			buffer[0] = 0x55;
+			buffer[1] = 0xAA;
+			buffer[2] = 0x55;
+			buffer[3] = 0x80;
+			buffer[4] = 0x80;
+			buffer[5] = 0x80;
+			buffer[6] = 0x80;
+			crc = calculate_crc16(&buffer[9]);
 		}
 		else
-			crc = calculate_crc16(&buff[2]);
+			crc = calculate_crc16(&buffer[2]);
 
-		k+=snprintf(&buff[k],15,"*%04X\n",crc);
+		k+=snprintf(&buffer[k],15,"*%04X\n",crc);
 		if  (format == 2){
-			k+=snprintf(&buff[k],3,"XX");
-			buff[k-1] = 0x80;
-			buff[k-2] = 0x80;
+			k+=snprintf(&buffer[k],3,"XX");
+			buffer[k-1] = 0x80;
+			buffer[k-2] = 0x80;
 		}
 #endif
 	}
 	else if ((format == 0) || (format == 3))
 	{
 #ifdef HABPACK
-		memset((void*)buff,0,len);
+		memset((void*)buffer,0,len);
 		hb_buf_ptr = 0;
 
 		cmp_ctx_t cmp;
 		hb_buf_ptr = 0;
-		cmp_init(&cmp, (void*)buff, 0, file_writer);
+		cmp_init(&cmp, (void*)buffer, 0, file_writer);
 
 		uint8_t total_send = 6;
 #ifdef RADIATION
@@ -1253,7 +1254,11 @@ uint16_t process_packet(char* buffer, uint16_t len, uint8_t format)
 		}
 #endif
 #endif
+#ifdef HABPACK
 		return hb_buf_ptr;
+#else
+		return 0;
+#endif
 	}
 	else
 		return 0;

@@ -1,5 +1,6 @@
 #include <inttypes.h>
 
+#include "util.h"
 
 uint16_t crc_xmodem_update (uint16_t crc, uint8_t data)
 {

@@ -27,7 +27,7 @@ inline uint16_t min(uint16_t in1, uint16_t in2)
 
 
 
-void radio_write_fsk_config(radio_fsk_settings_t *s)
+static void radio_write_fsk_config(radio_fsk_settings_t *s)
 {
 	uint8_t mode = radio_read_single_reg(REG_OP_MODE);
 	mode |= (1<<3); //set LF range
@@ -118,11 +118,6 @@ void radio_write_lora_config(radio_lora_settings_t *s)
 
 }
 
-void radio_set_preamble(uint16_t pre)
-{
-
-}
-
 void radio_sleep(void)
 {
 	uint8_t mode = radio_read_single_reg(REG_OP_MODE);
@@ -153,11 +148,6 @@ void radio_lna_max(void)
 
 }
 
-uint8_t radio_get_status(void)
-{
-	return radio_read_single_reg(REG_OP_MODE);
-}
-
 void radio_set_frequency_frreg(uint32_t f)
 {
 	radio_write_single_reg(REG_FRF_LSB,f & 0xFF);
@@ -175,23 +165,6 @@ void radio_set_frequency_frq(uint32_t f)
 
 	radio_set_frequency_frreg((uint32_t)reg);
 
-
-}
-
-
-void radio_set_slow_packet_time(void)
-{
-
-
-}
-
-void radio_set_explicit_rx_mode(uint8_t len, uint8_t rate, uint8_t crc_en)
-{
-
-}
-
-void radio_set_implicit_mode(void)
-{
 
 }
 
@@ -342,11 +315,6 @@ void radio_tx_packet(uint8_t *data, uint16_t len)
 	//write mode tx
 	r = radio_read_single_reg(REG_OP_MODE) & 0xF8;
 	radio_write_single_reg(REG_OP_MODE, r | MODE_TX);
-
-}
-
-void radio_carrier_on(void)
-{
 
 }
 
