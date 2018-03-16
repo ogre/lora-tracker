@@ -404,6 +404,39 @@ static void init_wdt(void)
 	IWDG_KR = 0xCCCC; */
 }
 
+static void gnss_configure(void)
+{
+	uint16_t ubloxcrc;
+
+	/* Configure flight mode */
+	uart_send_blocking_len((uint8_t*)flight_mode,44);
+
+	/* Disable NMEA Outputs */
+	uart_send_blocking_len((uint8_t*)disable_nmea_gpgga,16);
+	uart_send_blocking_len((uint8_t*)disable_nmea_gpgll,16);
+	uart_send_blocking_len((uint8_t*)disable_nmea_gpgsa,16);
+	uart_send_blocking_len((uint8_t*)disable_nmea_gpgsv,16);
+	uart_send_blocking_len((uint8_t*)disable_nmea_gprmc,16);
+	uart_send_blocking_len((uint8_t*)disable_nmea_gpvtg,16);
+
+	/* Set GPS Nav Rate */
+	memcpy(buff, set_rate,12);
+	buff[6] = GPS_UPDATE_PERIOD & 0xFF;
+	buff[7] = (GPS_UPDATE_PERIOD >> 8) & 0xFF;
+	ubloxcrc = calculate_ublox_crc((uint8_t*)&buff[2],10);
+
+	uart_send_blocking_len((uint8_t*)buff,12);
+	usart_send_blocking(USART1,ubloxcrc>>8);
+	usart_send_blocking(USART1,ubloxcrc&0xFF);
+
+	/* Enable UBX-NAV-PVT Output */
+	ubloxcrc = calculate_ublox_crc((uint8_t *)&enable_navpvt[2],16-4);
+
+	uart_send_blocking_len((uint8_t*)enable_navpvt,14);
+	usart_send_blocking(USART1,ubloxcrc>>8);
+	usart_send_blocking(USART1,ubloxcrc&0xFF);
+}
+
 void init (void)
 {
 	rcc_clock_setup_in_hsi_out_48mhz();
@@ -484,27 +517,8 @@ void init (void)
 
 //	_delay_ms(200);
 //	calibrate_hsi();
-	uart_send_blocking_len((uint8_t*)flight_mode,44);
-	uart_send_blocking_len((uint8_t*)disable_nmea_gpgga,16);
-	uart_send_blocking_len((uint8_t*)disable_nmea_gpgll,16);
-	uart_send_blocking_len((uint8_t*)disable_nmea_gpgsa,16);
-	uart_send_blocking_len((uint8_t*)disable_nmea_gpgsv,16);
-	uart_send_blocking_len((uint8_t*)disable_nmea_gprmc,16);
-	uart_send_blocking_len((uint8_t*)disable_nmea_gpvtg,16);
 
-	memcpy(buff, set_rate,12);
-	buff[6] = GPS_UPDATE_PERIOD & 0xFF;
-	buff[7] = (GPS_UPDATE_PERIOD >> 8) & 0xFF;
-	uint16_t ubloxcrc = calculate_ublox_crc((uint8_t*)&buff[2],10);
-
-	uart_send_blocking_len((uint8_t*)buff,12);
-	usart_send_blocking(USART1,ubloxcrc>>8);
-	usart_send_blocking(USART1,ubloxcrc&0xFF);
-
-	ubloxcrc = calculate_ublox_crc((uint8_t *)&enable_navpvt[2],16-4);
-	uart_send_blocking_len((uint8_t*)enable_navpvt,14);
-	usart_send_blocking(USART1,ubloxcrc>>8);
-	usart_send_blocking(USART1,ubloxcrc&0xFF);
+	gnss_configure();
 
 	//used to hiz the uart so the pc can query flight mode
 	//gpio_mode_setup(GPIOA, GPIO_MODE_INPUT, GPIO_PUPD_NONE,
@@ -765,8 +779,17 @@ int main(void)
 		cutdown_status = gpio_get(GPIOA,GPIO9) > 0;
 #endif
 
-		while((pos_updated == 0) && (gnss_status_updated == 0))
-			;//USART1_ICR = USART_ICR_ORECF | USART_ICR_FECF;
+		ms_countdown = 1000;
+		while((pos_updated == 0) && (gnss_status_updated == 0) && (ms_countdown)) {};
+
+		if((pos_updated == 0) && (gnss_status_updated == 0))
+		{
+			/* Reconfigure GNSS */
+			gnss_configure();
+			/* then transmit old info anyway */
+		}
+
+		//USART1_ICR = USART_ICR_ORECF | USART_ICR_FECF;
 #ifdef MULTI_POS
 		while((diff_count < MAX_POSITIONS_PER_SENTENCE) && (diff_valid > 0));
 #endif
