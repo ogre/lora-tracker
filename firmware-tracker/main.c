@@ -22,7 +22,7 @@ extern void initialise_monitor_handles(void);
 
 #define RADIO_FREQ  FREQ_434_300
 
-#define CALLSIGN_STR "FSFU"
+#define CALLSIGN_STR "CRAAG4"
 
 //#define RADIATION
 #define ENABLE_GPS		//comment out if a GPS is not yet fitted
@@ -30,8 +30,8 @@ extern void initialise_monitor_handles(void);
 
 #define UPLINK			//enables/disables uplink after each lora packet
 //#define MULTI_POS		//enables the sending of multiple GPS positions in a packet. Only works with msgpack/lora
-#define TESTING		//disables the WDT and sets a fake payload name (to prevent being accidently left enabled)
-#define CUTDOWN			//checks the uplinked message when cutdown is needed
+//#define TESTING		//disables the WDT and sets a fake payload name (to prevent being accidently left enabled)
+//#define CUTDOWN			//checks the uplinked message when cutdown is needed
 //#define HABPACK
 
 #if GPS_UBLOX_VERSION == 7
