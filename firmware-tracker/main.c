@@ -26,11 +26,21 @@ extern void initialise_monitor_handles(void);
 
 //#define RADIATION
 #define ENABLE_GPS		//comment out if a GPS is not yet fitted
+#define GPS_UBLOX_VERSION	7
+
 #define UPLINK			//enables/disables uplink after each lora packet
 //#define MULTI_POS		//enables the sending of multiple GPS positions in a packet. Only works with msgpack/lora
 #define TESTING		//disables the WDT and sets a fake payload name (to prevent being accidently left enabled)
 #define CUTDOWN			//checks the uplinked message when cutdown is needed
 //#define HABPACK
+
+#if GPS_UBLOX_VERSION == 7
+  #define GPS_NAVPVT_LEN	84
+#elif GPS_UBLOX_VERSION == 8
+  #define GPS_NAVPVT_LEN	92
+#else
+  #error "You must select Ublox version (7/8)"
+#endif
 
 #ifdef CUTDOWN
 #include "../cutdownpwd.h"
@@ -574,7 +584,7 @@ void usart1_isr(void)
 			{
 				//lets assume checksum == :)
 				gpio_set(GPIOF,GPIO1);
-				if ((gnss_message_id == 0x0107) && (gnss_string_len == 92))  //navpvt
+				if ((gnss_message_id == 0x0107) && (gnss_string_len == GPS_NAVPVT_LEN))  //navpvt
 				{
 					fixtype = gnss_buff[20];
 					uint8_t valid_time = gnss_buff[11];  //valid time flags
