@@ -14,82 +14,40 @@
 #include <string.h>
 #include <stdlib.h>
 
+extern void initialise_monitor_handles(void);
+
 #include "radio.h"
 #include "cmp.h"
 #include "util.h"
 
-extern void initialise_monitor_handles(void);
+#include "payload_config.h"
 
-#define RADIO_FREQ  FREQ_434_300
-
-#define CALLSIGN_STR "CRAAG4"
-
-//#define RADIATION
-#define ENABLE_GPS		//comment out if a GPS is not yet fitted
-#define GPS_UBLOX_VERSION	7
-
-#define UPLINK			//enables/disables uplink after each lora packet
-//#define MULTI_POS		//enables the sending of multiple GPS positions in a packet. Only works with msgpack/lora
-//#define TESTING		//disables the WDT and sets a fake payload name (to prevent being accidently left enabled)
-//#define CUTDOWN			//checks the uplinked message when cutdown is needed
-//#define HABPACK
+#ifdef CUTDOWN
+  #include "../cutdownpwd.h"
+  /* The file needs to declare:
+    const char cutdown_text[] = "CUTDOWNpassword";
+  */
+#endif
 
 #if GPS_UBLOX_VERSION == 7
   #define GPS_NAVPVT_LEN	84
 #elif GPS_UBLOX_VERSION == 8
   #define GPS_NAVPVT_LEN	92
 #else
-  #error "You must select Ublox version (7/8)"
-#endif
-
-#ifdef CUTDOWN
-#include "../cutdownpwd.h"
-//const char cutdown_text[] = "CUTDOWNpassword";
+  #error "You must select Ublox version (7/8) for NAV-PVT message."
 #endif
 
 #ifdef MULTI_POS
-#define GPS_UPDATE_PERIOD 200				// in ms. Should be a factor of 1000
-
-//Number of GPS positions to collect before starting to send another packet
-// MAX_POSITIONS_PER_SENTENCE/GPS_UPDATE_RATE   should ideally be an integer
-#define MAX_POSITIONS_PER_SENTENCE 20 //22    //TODO: ensure output buff is long enough
-//memory usage: 3 bytes + 4 (scaling) + 2 (object 62) + 3*2 (describing arrays)
-
-//Number of msgpack bytes. See item below
-#define MAX_MSGPACK_LEN 130   //TODO: THIS
-
-//Useful for testing. Ensure 'MAX_MSGPACK_LEN' number
-//  of bytes can be sent before all the GPS positions have been collected
-//	for the next packet
-#define PAD_MSGPACK_TO_MAX   //TODO: this
-
-static const uint8_t sentences_coding[] =    {CODING_4_5     };
-static const uint8_t sentences_spreading[] = {8             };
-static const uint8_t sentences_bandwidth[] = {BANDWIDTH_20_8K};
-
-#ifdef HABPACK
-#else
-#define HABPACK
-#warning "HABPACK has been turned on for multi-pos option"
-#endif
-#else
-#define GPS_UPDATE_PERIOD 1000
-
-//static const uint8_t sentences_coding[] =    {CODING_4_8,      CODING_4_6,      CODING_4_8,      CODING_4_5,      CODING_4_6,      CODING_4_6,     CODING_4_5,     0};
-//static const uint8_t sentences_spreading[] = {11,              8 ,              11,              8,               8,               11,             7,              0};
-//static const uint8_t sentences_bandwidth[] = {BANDWIDTH_20_8K, BANDWIDTH_20_8K, BANDWIDTH_41_7K, BANDWIDTH_41_7K, BANDWIDTH_20_8K, BANDWIDTH_20_8K, BANDWIDTH_125K, RTTY_SENTENCE};
-
-static const uint8_t sentences_coding[] =    {CODING_4_5,       };//0, 0};
-static const uint8_t sentences_spreading[] = {10,               };//0, 0};
-static const uint8_t sentences_bandwidth[] = {BANDWIDTH_41_7K,  };//RTTY_SENTENCE, RTTY_SENTENCE};
+  #ifndef HABPACK
+    #define HABPACK
+    #warning "HABPACK has been turned on for multi-pos option"
+  #endif
 #endif
 
 #define TOTAL_SENTENCES (sizeof(sentences_coding)/sizeof(uint8_t))
 #define MAX_VAL_DIFFS (127-1)
 #define MIN_VAL_DIFFS (-32+1)
 //These need another -1/+1 to avoid overflow due to accumulated rounding issues
-
-
 
 
 /* TIM14 option register (TIM14_OR) */
@@ -107,6 +65,7 @@ void process_diffs(uint8_t scaling_factor,uint8_t scaling_factor_alt);
 void process_diff(uint8_t scaling_factor, int32_t start_val, int32_t* input_diff, int8_t* output_diff);
 void get_radiation(uint32_t* rad1, uint32_t* rad2, uint32_t* rad3, uint32_t* current);
 
+/* Radiation Sensor Connections */
 #define CLK_PORT GPIOA
 #define CLK_PIN GPIO9
 #define DAT_PORT GPIOA
@@ -174,20 +133,20 @@ uint8_t cutdown_status = 0;
 
 
 #ifdef MULTI_POS
-volatile int32_t diff_lat [MAX_POSITIONS_PER_SENTENCE-1] = {0};  //TODO: check these are fine as int16
-volatile int32_t diff_long[MAX_POSITIONS_PER_SENTENCE-1] = {0};
-volatile int32_t diff_alt [MAX_POSITIONS_PER_SENTENCE-1] = {0};
-int8_t diff_lat_out [MAX_POSITIONS_PER_SENTENCE-1] = {0};
-int8_t diff_long_out [MAX_POSITIONS_PER_SENTENCE-1] = {0};
-int8_t diff_alt_out [MAX_POSITIONS_PER_SENTENCE-1] = {0};
-volatile uint8_t diff_count = 0;
-volatile uint8_t diff_valid = 0;
-volatile int32_t prev_latitude = 0;
-volatile int32_t prev_longitude = 0;
-volatile int32_t prev_altitude = 0;
-volatile uint8_t second_prev = 99;
-uint16_t diff_scaling_factor = 1;
-uint8_t diff_scaling_factor_alt = 1;
+	volatile int32_t diff_lat [MAX_POSITIONS_PER_SENTENCE-1] = {0};  //TODO: check these are fine as int16
+	volatile int32_t diff_long[MAX_POSITIONS_PER_SENTENCE-1] = {0};
+	volatile int32_t diff_alt [MAX_POSITIONS_PER_SENTENCE-1] = {0};
+	int8_t diff_lat_out [MAX_POSITIONS_PER_SENTENCE-1] = {0};
+	int8_t diff_long_out [MAX_POSITIONS_PER_SENTENCE-1] = {0};
+	int8_t diff_alt_out [MAX_POSITIONS_PER_SENTENCE-1] = {0};
+	volatile uint8_t diff_count = 0;
+	volatile uint8_t diff_valid = 0;
+	volatile int32_t prev_latitude = 0;
+	volatile int32_t prev_longitude = 0;
+	volatile int32_t prev_altitude = 0;
+	volatile uint8_t second_prev = 99;
+	uint16_t diff_scaling_factor = 1;
+	uint8_t diff_scaling_factor_alt = 1;
 #endif
 
 #ifdef RADIATION
@@ -751,12 +710,6 @@ int main(void)
 	radio_set_frequency_frreg(RADIO_FREQ);
 
 	uint16_t k;
-
-
-	//initialise_monitor_handles(); /* initialize handles */
-	//while(1)
-	//printf("hello world!\r\n");
-
 
 
 #ifdef MULTI_POS
