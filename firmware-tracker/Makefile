@@ -22,7 +22,9 @@
 BINARY = main
 
 SOURCES = $(filter-out $(BINARY).c, $(wildcard *.c))
+#$(info SOURCES: $(SOURCES))
 OBJS = $(SOURCES:.c=.o)
+#$(info OBJS: $(OBJS))
 
 # Set this to f0 or f4 depending on which STM32 you're using.
 include Makefile.f0.include
