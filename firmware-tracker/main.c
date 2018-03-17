@@ -51,7 +51,6 @@ extern void initialise_monitor_handles(void);
 
 
 /* TIM14 option register (TIM14_OR) */
-#define TIM_OR(tim_base)		MMIO32(tim_base + 0x50)
 #define TIM14_OR			TIM_OR(TIM14)
 
 void init(void);
@@ -318,7 +317,7 @@ void calibrate_hsi(void)
 	timer_reset(TIM14);
 	RCC_CR &= ~(1<<16); //HSE off
 	radio_write_single_reg(REG_OSC,7);    //sx1278 osc out off
-	rcc_clock_setup_in_hsi_out_8mhz();
+	//rcc_clock_setup_in_hsi_out_8mhz(); // TODO: No longer in libopencm3 (as of 0259102)
 
 	usart_send_blocking(USART1,0);
 	usart_send_blocking(USART1,trim_val);
@@ -417,10 +416,9 @@ void init (void)
 	rcc_periph_clock_enable(RCC_ADC);
 	rcc_periph_clock_enable(RCC_GPIOA);
 	gpio_mode_setup(GPIOA, GPIO_MODE_ANALOG, GPIO_PUPD_NONE, GPIO1);
-	uint8_t channel_array[] = { ADC_CHANNEL1};
+	uint8_t channel_array[] = { 0x1 }; // ADC Channel 1
 	adc_power_off(ADC1);
-	adc_calibrate_start(ADC1);
-	adc_calibrate_wait_finish(ADC1);
+	adc_calibrate(ADC1);
 	//adc_set_operation_mode(ADC1, ADC_MODE_SCAN); //adc_set_operation_mode(ADC1, ADC_MODE_SCAN_INFINITE);
 	adc_set_operation_mode(ADC1, ADC_MODE_SCAN);
 //	adc_set_single_conversion_mode(ADC1);
@@ -462,7 +460,7 @@ void init (void)
 
 	usart_set_parity(USART1 ,USART_PARITY_NONE);
 	usart_set_mode(USART1, USART_MODE_TX_RX );
-	usart_set_stopbits(USART1, USART_CR2_STOP_1_0BIT);
+	usart_set_stopbits(USART1, USART_CR2_STOPBITS_1);
 	usart_set_flow_control(USART1, USART_FLOWCONTROL_NONE);
 	usart_set_databits(USART1, 8);
 	usart_set_baudrate(USART1, 9600);
