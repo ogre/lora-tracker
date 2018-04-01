@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE eagle SYSTEM "eagle.dtd">
-<eagle version="6.5.0">
+<eagle version="6.6.0">
 <drawing>
 <settings>
 <setting alwaysvectorfont="no"/>
@@ -8205,6 +8205,54 @@ new: Attribute TP_SIGNAL_NAME&lt;br&gt;
 </deviceset>
 </devicesets>
 </library>
+<library name="wirepad">
+<description>&lt;b&gt;Single Pads&lt;/b&gt;&lt;p&gt;
+&lt;author&gt;Created by librarian@cadsoft.de&lt;/author&gt;</description>
+<packages>
+<package name="2,15/1,0">
+<description>&lt;b&gt;THROUGH-HOLE PAD&lt;/b&gt;</description>
+<wire x1="1.143" y1="-1.143" x2="1.143" y2="-0.635" width="0.1524" layer="21"/>
+<wire x1="1.143" y1="-1.143" x2="0.635" y2="-1.143" width="0.1524" layer="21"/>
+<wire x1="1.143" y1="0.635" x2="1.143" y2="1.143" width="0.1524" layer="21"/>
+<wire x1="1.143" y1="1.143" x2="0.635" y2="1.143" width="0.1524" layer="21"/>
+<wire x1="-0.635" y1="1.143" x2="-1.143" y2="1.143" width="0.1524" layer="21"/>
+<wire x1="-1.143" y1="1.143" x2="-1.143" y2="0.635" width="0.1524" layer="21"/>
+<wire x1="-1.143" y1="-0.635" x2="-1.143" y2="-1.143" width="0.1524" layer="21"/>
+<wire x1="-1.143" y1="-1.143" x2="-0.635" y2="-1.143" width="0.1524" layer="21"/>
+<circle x="0" y="0" radius="1.016" width="0.1524" layer="51"/>
+<pad name="1" x="0" y="0" drill="1.016" diameter="2.159" shape="octagon"/>
+<text x="-1.143" y="1.397" size="1.27" layer="25" ratio="10">&gt;NAME</text>
+<text x="0" y="1" size="0.0254" layer="27">&gt;VALUE</text>
+</package>
+</packages>
+<symbols>
+<symbol name="PAD">
+<wire x1="-1.016" y1="1.016" x2="1.016" y2="-1.016" width="0.254" layer="94"/>
+<wire x1="-1.016" y1="-1.016" x2="1.016" y2="1.016" width="0.254" layer="94"/>
+<text x="-1.143" y="1.8542" size="1.778" layer="95">&gt;NAME</text>
+<text x="-1.143" y="-3.302" size="1.778" layer="96">&gt;VALUE</text>
+<pin name="P" x="2.54" y="0" visible="off" length="short" direction="pas" rot="R180"/>
+</symbol>
+</symbols>
+<devicesets>
+<deviceset name="2,15/1,0" prefix="PAD" uservalue="yes">
+<description>&lt;b&gt;THROUGH-HOLE PAD&lt;/b&gt;</description>
+<gates>
+<gate name="1" symbol="PAD" x="0" y="0"/>
+</gates>
+<devices>
+<device name="" package="2,15/1,0">
+<connects>
+<connect gate="1" pin="P" pad="1"/>
+</connects>
+<technologies>
+<technology name=""/>
+</technologies>
+</device>
+</devices>
+</deviceset>
+</devicesets>
+</library>
 </libraries>
 <attributes>
 </attributes>
@@ -8255,9 +8303,6 @@ new: Attribute TP_SIGNAL_NAME&lt;br&gt;
 <part name="+3V6" library="supply1" deviceset="+3V3" device=""/>
 <part name="R5" library="rcl" deviceset="R-EU_" device="R0603" value="10k"/>
 <part name="+3V8" library="supply1" deviceset="+3V3" device=""/>
-<part name="C9" library="rcl" deviceset="C-EU" device="C0603"/>
-<part name="L2" library="SparkFun-Passives" deviceset="INDUCTOR" device="0603"/>
-<part name="GND19" library="supply1" deviceset="GND" device=""/>
 <part name="TP2" library="testpad" deviceset="PTR1" device="B1,27"/>
 <part name="TP3" library="testpad" deviceset="PTR1" device="B1,27"/>
 <part name="TP1" library="testpad" deviceset="PTR1" device="B1,27"/>
@@ -8267,6 +8312,9 @@ new: Attribute TP_SIGNAL_NAME&lt;br&gt;
 <part name="GND22" library="supply1" deviceset="GND" device=""/>
 <part name="GND23" library="supply1" deviceset="GND" device=""/>
 <part name="L3" library="SparkFun-Passives" deviceset="INDUCTOR" device="1210"/>
+<part name="C9" library="rcl" deviceset="C-EU" device="C0603" value="100p"/>
+<part name="PAD1" library="wirepad" deviceset="2,15/1,0" device=""/>
+<part name="PAD2" library="wirepad" deviceset="2,15/1,0" device=""/>
 </parts>
 <sheets>
 <sheet>
@@ -8313,9 +8361,6 @@ new: Attribute TP_SIGNAL_NAME&lt;br&gt;
 <instance part="+3V6" gate="G$1" x="60.96" y="60.96" rot="R90"/>
 <instance part="R5" gate="G$1" x="96.52" y="27.94" rot="R180"/>
 <instance part="+3V8" gate="G$1" x="7.62" y="5.08"/>
-<instance part="C9" gate="G$1" x="162.56" y="-7.62" rot="R90"/>
-<instance part="L2" gate="G$1" x="154.94" y="-15.24"/>
-<instance part="GND19" gate="1" x="154.94" y="-25.4"/>
 <instance part="TP2" gate="G$1" x="241.3" y="-38.1" rot="R90"/>
 <instance part="TP3" gate="G$1" x="241.3" y="-33.02" rot="R90"/>
 <instance part="TP1" gate="G$1" x="241.3" y="-43.18" rot="R90"/>
@@ -8325,6 +8370,9 @@ new: Attribute TP_SIGNAL_NAME&lt;br&gt;
 <instance part="GND22" gate="1" x="127" y="68.58"/>
 <instance part="GND23" gate="1" x="101.6" y="124.46" rot="R270"/>
 <instance part="L3" gate="G$1" x="149.86" y="88.9" rot="R90"/>
+<instance part="C9" gate="G$1" x="0" y="-2.54"/>
+<instance part="PAD1" gate="1" x="99.06" y="-27.94"/>
+<instance part="PAD2" gate="1" x="99.06" y="-20.32"/>
 </instances>
 <busses>
 </busses>
@@ -8415,14 +8463,13 @@ new: Attribute TP_SIGNAL_NAME&lt;br&gt;
 <junction x="15.24" y="-10.16"/>
 <pinref part="C2" gate="G$1" pin="2"/>
 <junction x="12.7" y="-7.62"/>
+<pinref part="C9" gate="G$1" pin="2"/>
+<wire x1="0" y1="-7.62" x2="7.62" y2="-7.62" width="0.1524" layer="91"/>
+<junction x="7.62" y="-7.62"/>
 </segment>
 <segment>
 <pinref part="C1" gate="G$1" pin="2"/>
 <pinref part="GND15" gate="1" pin="GND"/>
-</segment>
-<segment>
-<pinref part="L2" gate="G$1" pin="2"/>
-<pinref part="GND19" gate="1" pin="GND"/>
 </segment>
 <segment>
 <pinref part="TP1" gate="G$1" pin="TP"/>
@@ -8439,6 +8486,11 @@ new: Attribute TP_SIGNAL_NAME&lt;br&gt;
 <segment>
 <pinref part="X1" gate="G1" pin="2"/>
 <pinref part="GND23" gate="1" pin="GND"/>
+</segment>
+<segment>
+<wire x1="111.76" y1="-27.94" x2="101.6" y2="-27.94" width="0.1524" layer="91"/>
+<label x="106.68" y="-27.94" size="1.778" layer="95"/>
+<pinref part="PAD1" gate="1" pin="P"/>
 </segment>
 </net>
 <net name="N$6" class="0">
@@ -8511,6 +8563,13 @@ new: Attribute TP_SIGNAL_NAME&lt;br&gt;
 <junction x="12.7" y="2.54"/>
 <pinref part="+3V8" gate="G$1" pin="+3V3"/>
 <junction x="7.62" y="2.54"/>
+<pinref part="C9" gate="G$1" pin="1"/>
+<wire x1="0" y1="0" x2="7.62" y2="0" width="0.1524" layer="91"/>
+<junction x="7.62" y="0"/>
+</segment>
+<segment>
+<wire x1="119.38" y1="-20.32" x2="124.46" y2="-20.32" width="0.1524" layer="91"/>
+<label x="119.38" y="-20.32" size="1.778" layer="95"/>
 </segment>
 </net>
 <net name="SWDAT" class="0">
@@ -8631,6 +8690,11 @@ new: Attribute TP_SIGNAL_NAME&lt;br&gt;
 <pinref part="IC1" gate="G$1" pin="PF1"/>
 <wire x1="73.66" y1="-22.86" x2="86.36" y2="-22.86" width="0.1524" layer="91"/>
 </segment>
+<segment>
+<wire x1="101.6" y1="-20.32" x2="111.76" y2="-20.32" width="0.1524" layer="91"/>
+<label x="106.68" y="-20.32" size="1.778" layer="95"/>
+<pinref part="PAD2" gate="1" pin="P"/>
+</segment>
 </net>
 <net name="GPIO3" class="0">
 <segment>
@@ -8693,19 +8757,9 @@ new: Attribute TP_SIGNAL_NAME&lt;br&gt;
 <net name="N$1" class="0">
 <segment>
 <pinref part="X2" gate="G$1" pin="11_RF_IN"/>
-<pinref part="C9" gate="G$1" pin="2"/>
-<wire x1="177.8" y1="-7.62" x2="167.64" y2="-7.62" width="0.1524" layer="91"/>
-</segment>
-</net>
-<net name="N$4" class="0">
-<segment>
-<pinref part="C9" gate="G$1" pin="1"/>
 <pinref part="U$5" gate="G$1" pin="FEED"/>
-<wire x1="160.02" y1="-7.62" x2="154.94" y2="-7.62" width="0.1524" layer="91"/>
-<wire x1="154.94" y1="-7.62" x2="147.32" y2="-7.62" width="0.1524" layer="91"/>
+<wire x1="177.8" y1="-7.62" x2="147.32" y2="-7.62" width="0.1524" layer="91"/>
 <wire x1="147.32" y1="-7.62" x2="147.32" y2="-5.08" width="0.1524" layer="91"/>
-<pinref part="L2" gate="G$1" pin="1"/>
-<junction x="154.94" y="-7.62"/>
 </segment>
 </net>
 <net name="CLK" class="0">
