@@ -805,7 +805,11 @@ int main(void)
 			}
 			diff_count = 0; //make sure diff_count is reset to 0
 #else
+#ifdef HABPACK
+			k=process_packet(buff,100,0);
+#else
 			k=process_packet(buff,100,1);
+#endif
 #endif
 
 
@@ -1201,7 +1205,7 @@ uint16_t process_packet(char* buffer, uint16_t len, uint8_t format)
 		cmp_write_uint(&cmp, rad1);
 		cmp_write_uint(&cmp, rad2);
 #endif
-#ifdef UPLOAD
+#ifdef UPLINK
 		cmp_write_uint(&cmp, 50);
 		cmp_write_uint(&cmp, uplink_counter);
 #endif
