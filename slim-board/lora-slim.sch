@@ -8312,7 +8312,7 @@ new: Attribute TP_SIGNAL_NAME&lt;br&gt;
 <part name="GND22" library="supply1" deviceset="GND" device=""/>
 <part name="GND23" library="supply1" deviceset="GND" device=""/>
 <part name="L3" library="SparkFun-Passives" deviceset="INDUCTOR" device="1210"/>
-<part name="C9" library="rcl" deviceset="C-EU" device="C0603" value="100p"/>
+<part name="C9" library="rcl" deviceset="C-EU" device="C0603" value="10n"/>
 <part name="PAD1" library="wirepad" deviceset="2,15/1,0" device=""/>
 <part name="PAD2" library="wirepad" deviceset="2,15/1,0" device=""/>
 </parts>
