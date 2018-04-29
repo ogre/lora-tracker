@@ -621,13 +621,14 @@ uint16_t process_packet(char* buffer, uint16_t len, uint8_t format)
 
 	uint32_t bv = ADC1_DR;
 	bv = bv * 6;
-	bv = bv/100;
+	bv = bv / 10;
 	adc_start_conversion_regular(ADC1);
 	uint16_t k;
 
 	if(format == 0)
     {
         /* ASCII RTTY */
+		uint16_t crc;
 		k = 7;
 
 #ifdef TESTING
@@ -656,31 +657,9 @@ uint16_t process_packet(char* buffer, uint16_t len, uint8_t format)
 		else
 			k+=snprintf(&buffer[k],len-k,",ERR");
 #endif
-		uint16_t crc;
-
-		if (format == 2)
-        {
-			buffer[0] = 0x55;
-			buffer[1] = 0xAA;
-			buffer[2] = 0x55;
-			buffer[3] = 0x80;
-			buffer[4] = 0x80;
-			buffer[5] = 0x80;
-			buffer[6] = 0x80;
-			crc = calculate_crc16(&buffer[9]);
-		}
-		else
-        {
-			crc = calculate_crc16(&buffer[2]);
-        }
+		crc = calculate_crc16(&buffer[2]);
 
 		k+=snprintf(&buffer[k],15,"*%04X\n",crc);
-		if  (format == 2)
-        {
-			k+=snprintf(&buffer[k],3,"XX");
-			buffer[k-1] = 0x80;
-			buffer[k-2] = 0x80;
-		}
 
         return k;
 	}
