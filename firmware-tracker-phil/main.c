@@ -426,6 +426,7 @@ int main(void)
 #endif
 
 	init();
+	gpio_mode_setup(GPIOB, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO1);
 
 #ifndef TESTING
 	init_wdt();
@@ -462,7 +463,6 @@ int main(void)
 		//WDT reset
 		IWDG_KR = 0xAAAA;
 
-		gpio_mode_setup(GPIOB, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO1);
 		if (pos_valid)
 			GPIOB_ODR = 0;
 		else
@@ -494,15 +494,42 @@ int main(void)
 			radio_sleep();
 		}
 #ifdef HABPACK
+#ifdef CALLING
+		else if((payload_counter % CALLING_INTERVAL) == 0)
+		{
+			/* LoRa & HABpack Calling Mode */
+			s_lora.spreading_factor = 11;
+			s_lora.bandwidth = BANDWIDTH_41_7K;
+			s_lora.coding_rate = CODING_4_8;
+			s_lora.implicit_mode = 0;
+			s_lora.crc_en = 1;
+			s_lora.low_datarate = 0;
+
+			k=process_packet(buff,100,2);
+
+			radio_write_lora_config(&s_lora);
+
+			radio_standby();
+			radio_high_power();
+			radio_set_frequency_frreg(CALLING_FREQ);
+
+			radio_tx_packet((uint8_t*)(&buff[0]),k);
+
+			_delay_ms(200);
+
+			while(lora_in_progress())
+				_delay_ms(50);
+		}
+#endif
 		else
 		{
             /* LoRa & HABpack */
 			s_lora.spreading_factor = sentences_spreading[sentence_counter];
 			s_lora.bandwidth = sentences_bandwidth[sentence_counter];
 			s_lora.coding_rate = sentences_coding[sentence_counter];
-			s_lora.implicit_mode = 0;
+			s_lora.implicit_mode = sentences_implicit[sentence_counter];
 			s_lora.crc_en = 1;
-			s_lora.low_datarate = 1;    //todo: this
+			s_lora.low_datarate = 1;
 
 #ifdef UPLINK
             if (s_lora.bandwidth != BANDWIDTH_125K)
@@ -604,6 +631,7 @@ int main(void)
 //returns length written
 //format - 0 = UKHAS ASCII
 //         1 = HABpack
+//         2 = HABpack Calling Beacon
 uint16_t process_packet(char* buffer, uint16_t len, uint8_t format)
 {
 	nvic_disable_irq(NVIC_USART1_IRQ);
@@ -712,6 +740,54 @@ uint16_t process_packet(char* buffer, uint16_t len, uint8_t format)
 #endif
 		return hb_buf_ptr;
 	}
+#ifdef CALLING
+	else if (format == 2)
+	{
+		/* HABpack Calling Beacon */
+		memset((void*)buffer,0,len);
+		hb_buf_ptr = 0;
+
+		cmp_ctx_t cmp;
+		hb_buf_ptr = 0;
+		cmp_init(&cmp, (void*)buffer, 0, file_writer);
+
+		uint8_t total_send = 3;
+#ifndef CALLING_DOWNLINK_MODE
+		total_send = 7;
+#endif
+		
+		cmp_write_map(&cmp,total_send);
+
+		cmp_write_uint(&cmp, 0);
+#ifdef TESTING
+		cmp_write_str(&cmp, "PAYIOAD", 7);
+#else
+		cmp_write_str(&cmp, CALLSIGN_STR, (sizeof(CALLSIGN_STR)/sizeof(char))-1);
+#endif
+
+		cmp_write_uint(&cmp, 20);
+		cmp_write_uint(&cmp, CALLING_DOWNLINK_FREQ);
+
+#ifdef CALLING_DOWNLINK_MODE
+		cmp_write_uint(&cmp, 21);
+		cmp_write_uint(&cmp, CALLING_DOWNLINK_MODE);
+#else
+		cmp_write_uint(&cmp, 22);
+		cmp_write_uint(&cmp, CALLING_DOWNLINK_IMPLICIT);
+		cmp_write_uint(&cmp, 23);
+		cmp_write_uint(&cmp, CALLING_DOWNLINK_ERRORCODING);
+		cmp_write_uint(&cmp, 24);
+		cmp_write_uint(&cmp, CALLING_DOWNLINK_BANDWIDTH);
+		cmp_write_uint(&cmp, 25);
+		cmp_write_uint(&cmp, CALLING_DOWNLINK_SPREADING);
+		cmp_write_uint(&cmp, 26);
+		cmp_write_uint(&cmp, CALLING_DOWNLINK_LDO);
+#endif
+		payload_counter++;
+
+		return hb_buf_ptr;
+	}
+#endif
 #endif
 	
     /* Format not recognised */

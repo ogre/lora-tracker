@@ -1,5 +1,6 @@
 
 
+#define CALLING_FREQ    FREQ_433_650
 #define RADIO_FREQ  FREQ_434_300
 
 #define CALLSIGN_STR "CRAAG4"
@@ -13,9 +14,21 @@
 //#define TESTING       //disables the WDT and sets a fake payload name (to prevent being accidently left enabled)
 //#define CUTDOWN       //checks the uplinked message when cutdown is needed
 #define HABPACK
+#define CALLING // Enables Transmission on calling Frequency
+#define CALLING_INTERVAL   5//64 // sentences
+#define CALLING_DOWNLINK_FREQ   434300000
+
+//#define CALLING_DOWNLINK_MODE   0 // Mode of main downlink
+// **OR**
+#define CALLING_DOWNLINK_IMPLICIT   0
+#define CALLING_DOWNLINK_ERRORCODING   5
+#define CALLING_DOWNLINK_BANDWIDTH   3
+#define CALLING_DOWNLINK_SPREADING   10
+#define CALLING_DOWNLINK_LDO   1
 
 #define GPS_UPDATE_PERIOD 1000
 
+static const uint8_t sentences_implicit[]  = {0,                }; //0, 0};
 static const uint8_t sentences_coding[]    = {CODING_4_5,       }; //0, 0};
 static const uint8_t sentences_spreading[] = {10,               }; //0, 0};
 static const uint8_t sentences_bandwidth[] = {BANDWIDTH_20_8K,  }; //RTTY_SENTENCE, RTTY_SENTENCE};

@@ -84,6 +84,7 @@ void radio_set_single_rx(void);
 
 #define POWER_HIGH 0x88
 
+#define FREQ_433_650 7104910 /* LoRa Calling Freq */
 #define FREQ_434_000 7110656
 #define FREQ_434_025 7111066
 #define FREQ_434_050 7111475
