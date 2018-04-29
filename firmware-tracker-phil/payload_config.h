@@ -24,5 +24,5 @@ static const uint8_t sentences_bandwidth[] = {BANDWIDTH_20_8K,  }; //RTTY_SENTEN
 // GPS Update Rate should be something like 200ms. Should be a factor of 1000
 // Number of GPS positions to collect before starting to send another packet
 // MAX_POSITIONS_PER_SENTENCE/GPS_UPDATE_RATE   should ideally be an integer
-#define MAX_POSITIONS_PER_SENTENCE 20 //22    //TODO: ensure output buff is long enough
+//#define MAX_POSITIONS_PER_SENTENCE 20 //22    //TODO: ensure output buff is long enough
 // memory usage: 3 bytes + 4 (scaling) + 2 (object 62) + 3*2 (describing arrays)

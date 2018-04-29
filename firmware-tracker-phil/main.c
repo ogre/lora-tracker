@@ -37,13 +37,6 @@ extern void initialise_monitor_handles(void);
   #error "You must select Ublox version (7/8) for NAV-PVT message."
 #endif
 
-#ifdef MULTI_POS
-  #ifndef HABPACK
-    #define HABPACK
-    #warning "HABPACK has been turned on for multi-pos option"
-  #endif
-#endif
-
 #define TOTAL_SENTENCES (sizeof(sentences_coding)/sizeof(uint8_t))
 #define MAX_VAL_DIFFS (127-1)
 #define MIN_VAL_DIFFS (-32+1)
@@ -130,46 +123,11 @@ uint16_t uplink_counter = 0;
 uint16_t cutdown_counter = 0;
 uint8_t cutdown_status = 0;
 
-
-#ifdef MULTI_POS
-	volatile int32_t diff_lat [MAX_POSITIONS_PER_SENTENCE-1] = {0};  //TODO: check these are fine as int16
-	volatile int32_t diff_long[MAX_POSITIONS_PER_SENTENCE-1] = {0};
-	volatile int32_t diff_alt [MAX_POSITIONS_PER_SENTENCE-1] = {0};
-	int8_t diff_lat_out [MAX_POSITIONS_PER_SENTENCE-1] = {0};
-	int8_t diff_long_out [MAX_POSITIONS_PER_SENTENCE-1] = {0};
-	int8_t diff_alt_out [MAX_POSITIONS_PER_SENTENCE-1] = {0};
-	volatile uint8_t diff_count = 0;
-	volatile uint8_t diff_valid = 0;
-	volatile int32_t prev_latitude = 0;
-	volatile int32_t prev_longitude = 0;
-	volatile int32_t prev_altitude = 0;
-	volatile uint8_t second_prev = 99;
-	uint16_t diff_scaling_factor = 1;
-	uint8_t diff_scaling_factor_alt = 1;
-#endif
-
-#ifdef RADIATION
-	uint32_t rad1;
-	uint32_t rad2;
-	uint32_t rad3;
-	uint32_t current;
-#endif
-
 #ifdef HABPACK
-///////// msgpack stuff
 //#define HB_BUF_LEN 100
 //uint8_t hb_buf[HB_BUF_LEN] = {0};
 uint8_t hb_buf_ptr = 0;
 
-/*
-static bool read_bytes(void *data, size_t sz, FILE *fh) {
-    return fread(data, sizeof(uint8_t), sz, fh) == (sz * sizeof(uint8_t));
-}
-
-static bool file_reader(cmp_ctx_t *ctx, void *data, size_t limit) {
-    return read_bytes(data, limit, (FILE *)ctx->buf);
-}
-*/
 static size_t file_writer(cmp_ctx_t *ctx, const void *data, size_t count) {
 
 	uint16_t i;
@@ -185,146 +143,7 @@ static size_t file_writer(cmp_ctx_t *ctx, const void *data, size_t count) {
 	return count;
     //return fwrite(data, sizeof(uint8_t), count, (FILE *)ctx->buf);
 }
-
-/////////////////
 #endif
-
-
-static uint16_t cal_get_period(void)
-{
-	//measure ext clock
-	uint16_t c1,c2;
-	ms_countdown = 2*6*3;
-	while(((TIM14_SR & (1<<1))==0) && (ms_countdown>0));  //CC1IF
-	TIM14_SR |= (1<<1);
-	while(((TIM14_SR & (1<<1))==0) && (ms_countdown>0));  //CC1IF
-	TIM14_SR |= (1<<1);
-	c1 = TIM14_CCR1;
-	while(((TIM14_SR & (1<<1))==0) && (ms_countdown>0));  //CC1IF
-	TIM14_SR |= (1<<1);
-	c2 = TIM14_CCR1;
-
-	while(((TIM14_SR & (1<<1))==0) && (ms_countdown>0));  //CC1IF
-	TIM14_SR |= (1<<1);
-	//uint16_t c3 = TIM14_CCR1;
-
-	if (ms_countdown == 0) //error condition
-		return 0;
-
-	int32_t diff = c2-c1;
-	if(diff < 0)
-		diff += 65536;	//correct for overflows
-	return (uint16_t)diff;
-}
-
-void calibrate_hsi(void)
-{
-	return;
-	/*
-	uint8_t wasinsleep = 0;
-	if ((radio_read_single_reg(REG_OP_MODE)&0x7) == 0){
-		wasinsleep = 1;
-		radio_standby();
-	}
-	//turn on clkout for DIO5
-	uint8_t diomapping = radio_read_single_reg(REG_DIO_MAPPING2) & ~(3<<4);
-	if ((radio_read_single_reg(REG_OP_MODE)&(1<<7)) == 0) //FSK
-		radio_write_single_reg(REG_DIO_MAPPING2,diomapping);
-	else
-		radio_write_single_reg(REG_DIO_MAPPING2,diomapping | (1<<4));
-
-	diomapping = radio_read_single_reg(REG_DIO_MAPPING2);
-	*/
-	//radio_sleep();
-	//radio_write_single_reg(REG_OP_MODE,1);
-
-	radio_write_single_reg(REG_OSC,5);    //1MHz
-	rcc_clock_setup_in_hsi_out_48mhz();
-	RCC_CR |= (1<<18);   //HSE Bypass
-	RCC_CR |= (1<<16);   //HSE ON
-	_delay_ms(50);
-
-	//configure
-	timer_reset(TIM14);
-	TIM14_OR &= ~(0x3);
-	TIM14_OR |= 0x2;	//set TIM14 ch1 input to HSE/32
-	TIM14_CCMR1 = (0x9 << 4) | (3 << 2) | 1;    //bits1:0 = CC1 is an input, bits7:4 input filter, bits3:2 /4 prescaler.
-	TIM14_CCER |= 1; //rising edges, enable capture
-	timer_enable_counter(TIM14);
-	const uint16_t normal_len = 32*48*4*2;
-	const uint16_t error_len = 600*2;
-	const uint16_t expected_min_error = 100*2;
-	const uint16_t near_zero_error = 15*2;
-
-	// 5% of 6144 (ideal period) is 307
-
-
-	int16_t error = 100;
-
-	//binary search for trim
-	uint8_t trim_min = 0;
-	uint8_t trim_max = 31;
-	uint8_t tries = 5;
-	uint8_t trim_val;
-	uint32_t prev = RCC_CR;
-
-	while((tries>0) && (abs(error) > near_zero_error))
-	{
-		tries--;
-		trim_val = trim_min+((trim_max-trim_min)>>1);
-		RCC_CR &= ~(0x1F<<3);
-		RCC_CR |= trim_val<<3;
-		error = ((uint16_t)cal_get_period())-normal_len;
-
-		if (abs(error) > error_len)  //something went wrong, set trim to default
-		{
-			RCC_CR = prev;
-			tries = 0;
-		}
-
-		if (error < 0){ //HSI too slow
-			trim_min = trim_val;
-		}else{//HSI too fast
-			trim_max = trim_val;
-		}
-
-
-	}
-
-/*
-	uint8_t trim = 0;
-	uint16_t tf[32];
-	while(trim <= 0x1F){
-		RCC_CR &= ~(0x1F<<3);
-		RCC_CR |= trim<<3;
-		diff = cal_get_period();
-		tf[trim] = diff;
-		trim++;
-
-	}
-	*/
-
-	//final check
-	error = ((uint16_t)cal_get_period())-normal_len;
-	if (abs(error) > expected_min_error)  //something went wrong
-	{
-		RCC_CR &= ~(0x1F<<3);
-		RCC_CR |= 16<<3;
-	}
-
-
-
-	timer_reset(TIM14);
-	RCC_CR &= ~(1<<16); //HSE off
-	radio_write_single_reg(REG_OSC,7);    //sx1278 osc out off
-	//rcc_clock_setup_in_hsi_out_8mhz(); // TODO: No longer in libopencm3 (as of 0259102)
-
-	usart_send_blocking(USART1,0);
-	usart_send_blocking(USART1,trim_val);
-	////if (wasinsleep)
-	//	radio_sleep();
-
-}
 
 static void init_wdt(void)
 {
@@ -437,12 +256,6 @@ void init (void)
 #ifdef TESTING
 	gpio_mode_setup(GPIOA, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO10 | GPIO9);
 #endif
-#endif
-#ifdef RADIATION
-	gpio_mode_setup(CLK_PORT, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, CLK_PIN);
-	gpio_mode_setup(DAT_PORT, GPIO_MODE_INPUT, GPIO_PUPD_PULLDOWN, DAT_PIN);
-#else
-
 #endif
 
 #ifdef TESTING
@@ -560,88 +373,6 @@ void usart1_isr(void)
 					fixtype = gnss_buff[20];
 					uint8_t valid_time = gnss_buff[11];  //valid time flags
 
-#ifdef MULTI_POS
-					if ((valid_time & (1<<1)) && (diff_count==0))
-					{
-						hour = gnss_buff[8];
-						minute = gnss_buff[9];
-						//second_prev = second;
-						second = gnss_buff[10];
-						time_valid |= 1;
-					}
-
-					if (fixtype == 2 || fixtype == 3){
-						if((diff_count>0) && (diff_count < MAX_POSITIONS_PER_SENTENCE)){
-							int32_t temp;
-							gpio_set(GPIOA,GPIO0);
-							temp = (gnss_buff[31] << 24)
-									 | (gnss_buff[30] << 16)
-									 | (gnss_buff[29] << 8)
-									 | (gnss_buff[28]);
-							diff_lat[diff_count-1] = temp-prev_latitude;
-							prev_latitude = temp;
-
-							temp = (gnss_buff[27] << 24)
-									 | (gnss_buff[26] << 16)
-									 | (gnss_buff[25] << 8)
-									 | (gnss_buff[24]);
-							diff_long[diff_count-1] = temp-prev_longitude;
-							prev_longitude = temp;
-
-							temp = (gnss_buff[39] << 24)
-									 | (gnss_buff[38] << 16)
-									 | (gnss_buff[37] << 8)
-									 | (gnss_buff[36]);
-							diff_alt[diff_count-1] = temp-prev_altitude;
-							prev_altitude = temp;
-
-							diff_count++;
-						}
-						else if (diff_count==0){
-							//check if time is aligned to .000 sec
-							gpio_set(GPIOA,GPIO0);
-							if ((valid_time & (1<<1)) && (second_prev != second)){
-								latitude = (gnss_buff[31] << 24)
-										 | (gnss_buff[30] << 16)
-										 | (gnss_buff[29] << 8)
-										 | (gnss_buff[28]);
-								longitude = (gnss_buff[27] << 24)
-										 | (gnss_buff[26] << 16)
-										 | (gnss_buff[25] << 8)
-										 | (gnss_buff[24]);
-								altitude = (gnss_buff[39] << 24)
-										 | (gnss_buff[38] << 16)
-										 | (gnss_buff[37] << 8)
-										 | (gnss_buff[36]);
-								prev_latitude = latitude;
-								prev_longitude = longitude;
-								prev_altitude = altitude;
-								pos_valid |= 1;
-								diff_count++;
-								diff_valid = 1;
-							}
-						}
-					}
-					else if ((diff_count>0) && (diff_count < MAX_POSITIONS_PER_SENTENCE)){
-						//if gps loses lock we still want to fill in the diff array
-						//no changes to prev_position
-						diff_lat[diff_count-1] = 0;
-						diff_long[diff_count-1] = 0;
-						diff_alt[diff_count-1] = 0;
-						diff_count++;
-					}
-					else if (diff_count==0){
-						//if no lock at start of sequence, then disable sending diffs
-						diff_valid = 0;
-
-						//diff_count=0; //keep this at 0.
-					}
-
-					if (valid_time & (1<<1))
-						second_prev = gnss_buff[10];
-
-
-#else
 					if (fixtype == 2 || fixtype == 3){
 						latitude = (gnss_buff[31] << 24)
 								 | (gnss_buff[30] << 16)
@@ -664,8 +395,6 @@ void usart1_isr(void)
 						second = gnss_buff[10];
 						time_valid |= 1;
 					}
-
-#endif
 
 					sats = gnss_buff[23];
 					gnss_status_updated = 1;
@@ -690,29 +419,22 @@ void usart1_isr(void)
 
 int main(void)
 {
+ 	radio_lora_settings_t s_lora;
+	uint16_t k;
+#ifdef UPLINK
+ 	uint8_t uplink_en = 1;
+#endif
 
 	init();
+
 #ifndef TESTING
 	init_wdt();
 #endif
 
- 	radio_lora_settings_t s_lora;
-
 	_delay_ms(100);
-
-
- 	uint8_t uplink_en = 1;
-
-
  	radio_high_power();
 	radio_set_frequency_frreg(RADIO_FREQ);
 
-	uint16_t k;
-
-
-#ifdef MULTI_POS
-	diff_count = 0;
-#endif
 	while(1)
 	{
 
@@ -720,12 +442,9 @@ int main(void)
 		gnss_status_updated = 1;
 #endif
 
-		//calibrate_hsi();
+		/* Set Flight Mode */
 		uart_send_blocking_len((uint8_t*)flight_mode,44);
 
-#ifdef RADIATION
-		get_radiation(&rad1, &rad2, &rad3, &current);
-#endif
 #ifdef CUTDOWN
 		cutdown_status = gpio_get(GPIOA,GPIO9) > 0;
 #endif
@@ -735,15 +454,10 @@ int main(void)
 
 		if((pos_updated == 0) && (gnss_status_updated == 0))
 		{
-			/* Reconfigure GNSS */
+			/* Didn't receive position, so reconfigure GNSS */
 			gnss_configure();
 			/* then transmit old info anyway */
 		}
-
-		//USART1_ICR = USART_ICR_ORECF | USART_ICR_FECF;
-#ifdef MULTI_POS
-		while((diff_count < MAX_POSITIONS_PER_SENTENCE) && (diff_valid > 0));
-#endif
 
 		//WDT reset
 		IWDG_KR = 0xAAAA;
@@ -761,15 +475,17 @@ int main(void)
 		radio_sleep();
 		_delay_ms(10);
 
+#ifdef UPLINK
 		uplink_en = 0;
-		if (sentences_bandwidth[sentence_counter] == RTTY_SENTENCE)//(payload_counter & 0x3) == 0x3)  //rtty
+#endif
+		if (sentences_bandwidth[sentence_counter] == RTTY_SENTENCE)
 		{
-			process_packet(buff,100,2);
+            /* RTTY & ASCII */
+			process_packet(buff,100,0);
 
 			radio_high_power();
 			radio_start_tx_rtty((char*)buff,BAUD_50,4);
-			gpio_mode_setup(GPIOB, GPIO_MODE_INPUT, GPIO_PUPD_NONE, GPIO1);  //turn off led
-			//calibrate_hsi();
+
 			while(rtty_in_progress() != 0){
 				radio_rtty_poll_buffer_refill();
 				_delay_ms(20);
@@ -777,8 +493,10 @@ int main(void)
 			_delay_ms(300);
 			radio_sleep();
 		}
-		else   //lora
+#ifdef HABPACK
+		else
 		{
+            /* LoRa & HABpack */
 			s_lora.spreading_factor = sentences_spreading[sentence_counter];
 			s_lora.bandwidth = sentences_bandwidth[sentence_counter];
 			s_lora.coding_rate = sentences_coding[sentence_counter];
@@ -786,32 +504,12 @@ int main(void)
 			s_lora.crc_en = 1;
 			s_lora.low_datarate = 1;    //todo: this
 
-			if (s_lora.bandwidth != BANDWIDTH_125K)
-				uplink_en = 1;
+#ifdef UPLINK
+            if (s_lora.bandwidth != BANDWIDTH_125K)
+                uplink_en = 1;
+#endif
 
-#ifdef MULTI_POS
-			if ((diff_count < MAX_POSITIONS_PER_SENTENCE))
-				k=process_packet(buff,100,0);
-			else{
-				uint8_t d = find_diff_scaling();
-				uint8_t da = find_diff_scaling_alt();
-				diff_scaling_factor = d;
-				diff_scaling_factor_alt = da;
-				//process_diffs(d,0);
-				process_diff(d, latitude, (int32_t *)diff_lat, diff_lat_out);
-				process_diff(d, longitude, (int32_t *)diff_long, diff_long_out);
-				process_diff(da, altitude, (int32_t *)diff_alt, diff_alt_out);
-				k=process_packet(buff,100,3);
-			}
-			diff_count = 0; //make sure diff_count is reset to 0
-#else
-#ifdef HABPACK
-			k=process_packet(buff,100,0);
-#else
 			k=process_packet(buff,100,1);
-#endif
-#endif
-
 
 
 			radio_write_lora_config(&s_lora);
@@ -820,8 +518,6 @@ int main(void)
 			radio_high_power();
 			radio_set_frequency_frreg(RADIO_FREQ);
 
-			gpio_mode_setup(GPIOB, GPIO_MODE_INPUT, GPIO_PUPD_NONE, GPIO1); //turn off led
-
 			radio_tx_packet((uint8_t*)(&buff[0]),k);
 
 			_delay_ms(200);
@@ -829,6 +525,7 @@ int main(void)
 			while(lora_in_progress())
 				_delay_ms(50);
 		}
+#endif
 
 #ifdef UPLINK
 
@@ -856,21 +553,6 @@ int main(void)
 				while(count){
 					_delay_ms(40);
 					uint8_t irq = radio_read_single_reg(REG_IRQ_FLAGS);
-/*					//uint8_t nb = radio_read_single_reg(REG_RX_NB_BYTES);
-					//uint8_t hrx = radio_read_single_reg(REG_RX_HEADER_CNT_VALUE_LSB);
-
-					int32_t ui_offset = radio_read_single_reg(REG_FEI_MSB_LORA) << 8;
-					ui_offset = (ui_offset | radio_read_single_reg(REG_FEI_MID_LORA)) << 8;
-					ui_offset |= radio_read_single_reg(REG_FEI_LSB_LORA);
-
-					if (ui_offset & 0x080000)
-						ui_offset |= 0xFFF00000;
-
-					snprintf(buff,60,"stat: %X  irq: %X headers rx: %X nBytes: %d offset: %li\r\n",stat,irq,hrx,nb,ui_offset);
-					i=0;
-					while (buff[i])
-						usart_send_blocking(USART1, buff[i++]);
-*/
 					if (irq & (1<<6))
 					{
 						count = 0;
@@ -908,171 +590,20 @@ int main(void)
 				}
 			}
 
-
 			radio_sleep();
 			_delay_ms(10);
-			//s_lora.bandwidth = BANDWIDTH_20_8K;
-			//radio_write_lora_config(&s_lora);
-			//radio_set_frequency_frreg(RADIO_FREQ);
-
-			/*
-			radio_standby();
-			radio_high_power();
-			*/
 		}
 		else
 			_delay_ms(50);
 #else
 		_delay_ms(50);
 #endif
-
-
 	}
 }
-
-#ifdef RADIATION
-void get_radiation(uint32_t *rad1, uint32_t *rad2, uint32_t *rad3, uint32_t *current){
-
-	uint8_t i,j;
-	uint32_t* din;
-	_delay_ms(1);
-
-	for (i = 0; i < 4; i++){
-
-		switch(i){
-		case 0:	 din = rad1; break;
-		case 1:	 din = rad2; break;
-		case 2:	 din = rad3; break;
-		default: din = current; break;
-		}
-
-		for (j = 0; j < 32; j++){
-			*din <<= 1;
-			gpio_set(CLK_PORT, CLK_PIN);
-			_delay_ms(1);
-			if (gpio_get(DAT_PORT, DAT_PIN))
-				*din |= 1;
-			gpio_clear(CLK_PORT, CLK_PIN);
-
-			_delay_ms(1);
-		}
-	}
-}
-#endif
-
-#ifdef MULTI_POS
-void process_diff(uint8_t scaling_factor, int32_t start_val, int32_t* input_diff, int8_t* output_diff)
-{
-	int32_t acc, current, diff;
-	uint16_t i;
-
-	current = start_val + input_diff[0];
-	output_diff[0] = (int8_t)(input_diff[0] >> scaling_factor);   //TODO: CHECK THIS WILL BEHAVE AS EXPECTED!
-	acc = start_val + ((int32_t)output_diff[0] << scaling_factor);
-	for(i = 1; i < MAX_POSITIONS_PER_SENTENCE-1; i++){
-		current = current + input_diff[i];
-		diff = current - acc;
-		output_diff[i] = (int8_t)(diff >> scaling_factor);
-		acc = acc + ((int32_t)output_diff[i] << scaling_factor);
-	}
-}
-
-void process_diffs(uint8_t scaling_factor, uint8_t scaling_factor_alt)
-{
-	int32_t lat_acc, lat_current, diff, long_acc, long_current, alt_acc, alt_current;
-	uint16_t i;
-
-	lat_current = latitude + diff_lat[0];
-	diff_lat_out[0] = (int8_t)(diff_lat[0] >> scaling_factor);   //TODO: CHECK THIS WILL BEHAVE AS EXPECTED!
-	lat_acc = latitude + ((int32_t)diff_lat_out[0] << scaling_factor);
-	for(i = 1; i < MAX_POSITIONS_PER_SENTENCE-1; i++){
-		lat_current = lat_current + diff_lat[i];
-		diff = lat_current - lat_acc;
-		diff_lat_out[i] = (int8_t)(diff >> scaling_factor);
-		lat_acc = lat_acc + ((int32_t)diff_lat_out[i] << scaling_factor);
-	}
-
-//TODO: check diffs are not too big
-	long_current = longitude + diff_long[0];
-	diff_long_out[0] = (int8_t)(diff_long[0] >> scaling_factor);
-	long_acc = longitude + ((int32_t)diff_long_out[0] << scaling_factor);
-	for(i = 1; i < MAX_POSITIONS_PER_SENTENCE-1; i++){
-		long_current = long_current + diff_long[i];
-		diff = long_current - long_acc;
-		diff_long_out[i] = (int8_t)(diff >> scaling_factor);
-		long_acc = long_acc + ((int32_t)diff_long_out[i] << scaling_factor);
-	}
-
-	alt_current = altitude + diff_alt[0];
-	diff_alt_out[0] = (int8_t)(diff_alt[0] >> scaling_factor_alt);
-	alt_acc = altitude + ((int32_t)diff_alt_out[0] << scaling_factor_alt);
-	for(i = 1; i < MAX_POSITIONS_PER_SENTENCE-1; i++){
-		alt_current = alt_current + diff_alt[i];
-		diff = alt_current - alt_acc;
-		diff_alt_out[i] = (int8_t)(diff >> scaling_factor);
-		alt_acc = alt_acc + ((int32_t)diff_alt_out[i] << scaling_factor_alt);
-	}
-}
-
-uint8_t find_diff_scaling(void)
-{
-	int16_t diff_max = diff_lat[0];
-	int16_t diff_min = diff_lat[0];
-	uint16_t i;
-
-	//find max/min
-	for (i = 0; i < MAX_POSITIONS_PER_SENTENCE-1; i++){
-		if (diff_lat[i] > diff_max)
-			diff_max = diff_lat[i];
-		if (diff_long[i] > diff_max)
-			diff_max = diff_long[i];
-
-		if (diff_lat[i] < diff_min)
-			diff_min = diff_lat[i];
-		if (diff_long[i] < diff_min)
-			diff_min = diff_long[i];
-	}
-
-
-	uint16_t out = 0;
-	while((diff_max > MAX_VAL_DIFFS) || (diff_min < MIN_VAL_DIFFS)){
-		out++;
-		diff_max = diff_max /2;
-		diff_min = diff_min /2;
-	}
-	return out;
-}
-
-uint8_t find_diff_scaling_alt(void)
-{
-	int16_t diff_max = diff_alt[0];
-	int16_t diff_min = diff_alt[0];
-	uint16_t i;
-
-	//find max/min
-	for (i = 0; i < MAX_POSITIONS_PER_SENTENCE-1; i++){
-		if (diff_alt[i] > diff_max)
-			diff_max = diff_alt[i];
-		if (diff_alt[i] < diff_min)
-			diff_min = diff_alt[i];
-	}
-
-
-	uint16_t out = 0;
-	while((diff_max > MAX_VAL_DIFFS) || (diff_min < MIN_VAL_DIFFS)){
-		out++;
-		diff_max = diff_max /2;
-		diff_min = diff_min /2;
-	}
-	return out;
-}
-#endif
 
 //returns length written
-//format - 0 = habpack
-//         1 = ascii
-//         2 = ascii & rtty
-//         3 = habpack diffs
+//format - 0 = UKHAS ASCII
+//         1 = HABpack
 uint16_t process_packet(char* buffer, uint16_t len, uint8_t format)
 {
 	nvic_disable_irq(NVIC_USART1_IRQ);
@@ -1094,11 +625,11 @@ uint16_t process_packet(char* buffer, uint16_t len, uint8_t format)
 	adc_start_conversion_regular(ADC1);
 	uint16_t k;
 
-	if ((format == 1) || (format == 2)){
-		k=0;
-#ifndef MULTI_POS
-		if  (format == 2)
-			k=7;//snprintf(&buffer[k],len,"xxxxx");
+	if(format == 0)
+    {
+        /* ASCII RTTY */
+		k = 7;
+
 #ifdef TESTING
 		k+=snprintf(&buffer[k],len-k,"$$PAYIOAD,%u,",payload_counter++);
 #else
@@ -1127,7 +658,8 @@ uint16_t process_packet(char* buffer, uint16_t len, uint8_t format)
 #endif
 		uint16_t crc;
 
-		if (format == 2){
+		if (format == 2)
+        {
 			buffer[0] = 0x55;
 			buffer[1] = 0xAA;
 			buffer[2] = 0x55;
@@ -1138,19 +670,24 @@ uint16_t process_packet(char* buffer, uint16_t len, uint8_t format)
 			crc = calculate_crc16(&buffer[9]);
 		}
 		else
+        {
 			crc = calculate_crc16(&buffer[2]);
+        }
 
 		k+=snprintf(&buffer[k],15,"*%04X\n",crc);
-		if  (format == 2){
+		if  (format == 2)
+        {
 			k+=snprintf(&buffer[k],3,"XX");
 			buffer[k-1] = 0x80;
 			buffer[k-2] = 0x80;
 		}
-#endif
+
+        return k;
 	}
-	else if ((format == 0) || (format == 3))
-	{
 #ifdef HABPACK
+	else if (format == 1)
+	{
+        /* HABpack */
 		memset((void*)buffer,0,len);
 		hb_buf_ptr = 0;
 
@@ -1159,15 +696,9 @@ uint16_t process_packet(char* buffer, uint16_t len, uint8_t format)
 		cmp_init(&cmp, (void*)buffer, 0, file_writer);
 
 		uint8_t total_send = 6;
-#ifdef RADIATION
-		total_send += 2;
-#endif
 #ifdef UPLINK
 		total_send += 1;
 #endif
-
-		if (format == 3)
-			total_send += 3;
 
 		cmp_write_map(&cmp,total_send);
 
@@ -1193,62 +724,23 @@ uint16_t process_packet(char* buffer, uint16_t len, uint8_t format)
 		cmp_write_uint(&cmp, 4);
 		cmp_write_uint(&cmp, _sats);
 
-		cmp_write_uint(&cmp, 40);
-		cmp_write_uint(&cmp, bv);
+		cmp_write_uint(&cmp, 6);
+		cmp_write_sint(&cmp, bv);
 
-#ifdef RADIATION
-		cmp_write_uint(&cmp, 41);
-		cmp_write_uint(&cmp, current & 0xFFFF);
-
-		cmp_write_uint(&cmp, 39);
-		cmp_write_array(&cmp, 2);
-		cmp_write_uint(&cmp, rad1);
-		cmp_write_uint(&cmp, rad2);
-#endif
 #ifdef UPLINK
-		cmp_write_uint(&cmp, 50);
+		cmp_write_uint(&cmp, 30);
 		cmp_write_uint(&cmp, uplink_counter);
 #endif
-#ifdef MULTIPOS
-		if (format == 3){
-			uint16_t i;
-			cmp_write_uint(&cmp, 60);
-			cmp_write_uint(&cmp, diff_scaling_factor);
-
-			cmp_write_uint(&cmp, 61);	//altitude diff
-			cmp_write_uint(&cmp, diff_scaling_factor_alt);
-
-			cmp_write_uint(&cmp, 62);
-			cmp_write_array(&cmp, 3);
-			cmp_write_array(&cmp, MAX_POSITIONS_PER_SENTENCE-1);
-			for (i = 0; i < MAX_POSITIONS_PER_SENTENCE-1; i++)
-				cmp_write_int(&cmp, diff_lat_out[i]);
-			cmp_write_array(&cmp, MAX_POSITIONS_PER_SENTENCE-1);
-			for (i = 0; i < MAX_POSITIONS_PER_SENTENCE-1; i++)
-				cmp_write_int(&cmp, diff_long_out[i]);
-			cmp_write_array(&cmp, MAX_POSITIONS_PER_SENTENCE-1);
-			for (i = 0; i < MAX_POSITIONS_PER_SENTENCE-1; i++)
-				cmp_write_int(&cmp, diff_alt_out[i]);
-		}
-#endif
-#endif
-#ifdef HABPACK
 		return hb_buf_ptr;
-#else
-		return 0;
-#endif
 	}
-	else
-		return 0;
-
-	return k;
+#endif
+	
+    /* Format not recognised */
+    return 0;
 }
-
-
 
 void _delay_ms(const uint32_t delay)
 {
 	ms_countdown = delay;
-	while(ms_countdown);
-
+	while(ms_countdown) { };
 }
