@@ -37,13 +37,8 @@ extern void initialise_monitor_handles(void);
 #endif
 
 #define TOTAL_SENTENCES (sizeof(sentences_coding)/sizeof(uint8_t))
-#define MAX_VAL_DIFFS (127-1)
-#define MIN_VAL_DIFFS (-32+1)
-//These need another -1/+1 to avoid overflow due to accumulated rounding issues
 
-
-/* TIM14 option register (TIM14_OR) */
-#define TIM14_OR			TIM_OR(TIM14)
+#define ABS(x)	((x < 0) ? -x : x)
 
 void init(void);
 void calibrate_hsi(void);
@@ -213,6 +208,10 @@ void init (void)
 	rcc_periph_clock_enable(RCC_GPIOA);
 	rcc_periph_clock_enable(RCC_TIM14);
 
+	//gpio
+	rcc_periph_clock_enable(RCC_GPIOF);
+	gpio_mode_setup(GPIOF, GPIO_MODE_INPUT, GPIO_PUPD_NONE, GPIO1);
+
 	//systick
 	systick_set_clocksource(STK_CSR_CLKSOURCE_AHB);
 	systick_set_reload(48000-1);		//1kHz at 8MHz clock
@@ -240,21 +239,6 @@ void init (void)
 	adc_disable_analog_watchdog(ADC1);
 	adc_power_on(ADC1);
 
-#ifdef CUTDOWN
-	gpio_mode_setup(GPIOA, GPIO_MODE_INPUT, GPIO_PUPD_PULLDOWN, GPIO9);
-	gpio_mode_setup(GPIOA, GPIO_MODE_INPUT, GPIO_PUPD_NONE, GPIO10);
-#else
-#ifdef TESTING
-	gpio_mode_setup(GPIOA, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO10 | GPIO9);
-#endif
-#endif
-
-#ifdef TESTING
-	rcc_periph_clock_enable(RCC_GPIOF);
-	gpio_mode_setup(GPIOA, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO0);
-	gpio_mode_setup(GPIOF, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO1);
-#endif
-
 	//uart
 	nvic_enable_irq(NVIC_USART1_IRQ);
 	rcc_periph_clock_enable(RCC_USART1);
@@ -272,14 +256,6 @@ void init (void)
 	usart_enable(USART1);
 
 	adc_start_conversion_regular(ADC1);
-
-	_delay_ms(200);
-	radio_init();
-
-//	_delay_ms(200);
-//	calibrate_hsi();
-
-	gnss_configure();
 
 	//used to hiz the uart so the pc can query flight mode
 	//gpio_mode_setup(GPIOA, GPIO_MODE_INPUT, GPIO_PUPD_NONE,
@@ -305,14 +281,11 @@ void usart1_isr(void)
 
 	if (((USART_ISR(USART1) & USART_ISR_RXNE) != 0))
 	{
-
-
 		uint8_t d = (uint8_t)USART1_RDR;
 
 		if (gnss_string_count == 0){ //look for '0xB5'
 			if (d == 0xB5){
 				gnss_string_count++;
-				gpio_set(GPIOF,GPIO1);
 			}
 		}
 		else if (gnss_string_count == 1){ //look for '0x62'
@@ -358,7 +331,6 @@ void usart1_isr(void)
 			if ((gnss_string_count-6-2) == gnss_string_len) //got all bytes, check checksum
 			{
 				//lets assume checksum == :)
-				gpio_set(GPIOF,GPIO1);
 				if ((gnss_message_id == 0x0107) && (gnss_string_len == GPS_NAVPVT_LEN))  //navpvt
 				{
 					fixtype = gnss_buff[20];
@@ -395,8 +367,6 @@ void usart1_isr(void)
 				gnss_string_count = 0;  //wait for the next string
 			}
 		}
-		gpio_clear(GPIOA,GPIO0);
-		gpio_clear(GPIOF,GPIO1);
 	}
 	else// if (((USART_ISR(USART1) & USART_ISR_ORE) != 0))  //overrun, clear flag
 	{
@@ -419,11 +389,14 @@ int main(void)
 #endif
 
 	init();
-	gpio_mode_setup(GPIOB, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO1);
 
 #ifndef TESTING
 	init_wdt();
 #endif
+
+	_delay_ms(200);
+	gnss_configure();
+	radio_init();
 
 	_delay_ms(100);
  	radio_high_power();
@@ -440,7 +413,7 @@ int main(void)
 		uart_send_blocking_len((uint8_t*)flight_mode,44);
 
 #ifdef CUTDOWN
-		cutdown_status = gpio_get(GPIOA,GPIO9) > 0;
+		cutdown_status = gpio_get(GPIOF,GPIO1) > 0;
 #endif
 
 		ms_countdown = 1000;
@@ -455,11 +428,6 @@ int main(void)
 
 		//WDT reset
 		IWDG_KR = 0xAAAA;
-
-		if (pos_valid)
-			GPIOB_ODR = 0;
-		else
-			GPIOB_ODR = (1<<1);
 
 		sentence_counter++;
 		if (sentence_counter >= TOTAL_SENTENCES)
@@ -593,12 +561,10 @@ int main(void)
 								}
 								if (cut){
 									cutdown_counter++;
-									gpio_mode_setup(GPIOB, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO1);
-									gpio_mode_setup(GPIOA, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO10);  //FIRE!
-									gpio_clear(GPIOA,GPIO10);
+									gpio_mode_setup(GPIOF, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO1);  //FIRE!
+									gpio_clear(GPIOF,GPIO1);
 									_delay_ms(2000);
-									gpio_mode_setup(GPIOB, GPIO_MODE_INPUT, GPIO_PUPD_NONE, GPIO1);
-									gpio_mode_setup(GPIOA, GPIO_MODE_INPUT, GPIO_PUPD_NONE, GPIO10);
+									gpio_mode_setup(GPIOF, GPIO_MODE_INPUT, GPIO_PUPD_NONE, GPIO1);
 
 								}
 							}
@@ -628,6 +594,9 @@ int main(void)
 //         2 = HABpack Calling Beacon
 uint16_t process_packet(char* buffer, uint16_t len, uint8_t format)
 {
+	uint16_t k;
+
+	/* Copy out GPS data, disable IRQ while we do */
 	nvic_disable_irq(NVIC_USART1_IRQ);
 	int32_t _latitude = latitude;
 	int32_t _longitude = longitude;
@@ -641,11 +610,11 @@ uint16_t process_packet(char* buffer, uint16_t len, uint8_t format)
 	gnss_status_updated = 0;
 	nvic_enable_irq(NVIC_USART1_IRQ);
 
+	/* Read Battery Voltage */
 	uint32_t bv = ADC1_DR;
 	bv = bv * BATTV_MUL;
 	bv = bv / BATTV_DIV;
 	adc_start_conversion_regular(ADC1);
-	uint16_t k;
 
 	if(format == 0)
     {
@@ -653,6 +622,7 @@ uint16_t process_packet(char* buffer, uint16_t len, uint8_t format)
 		uint16_t crc;
 
 		k = 0;
+		/* Mysterious header */
 		buff[k++] = 0x55;
 		buff[k++] = 0xAA;
 		buff[k++] = 0x55;
@@ -673,13 +643,17 @@ uint16_t process_packet(char* buffer, uint16_t len, uint8_t format)
 			k+=snprintf(&buffer[k],len-k,",");
 
 		if (pos_valid)
-			k+=snprintf(&buffer[k],len-k,"%ld,%ld,%ld,%u",
-					_latitude,_longitude,_altitude,_sats);
+			k+=snprintf(&buffer[k],len-k,"%ld.%07ld,%ld.%07ld,%ld,%u",
+					_latitude / 10000000, ABS(_latitude) % 10000000,
+					_longitude / 10000000, ABS(_longitude) % 10000000,
+					_altitude,
+					_sats);
 		else
 			k+=snprintf(&buffer[k],len-k,",,,%u",
 					_sats);
 
-		k+=snprintf(&buffer[k],len-k,",%lu",bv);
+		k+=snprintf(&buffer[k],len-k,",%ld.%03ld",
+					bv / 1000, bv % 1000);
 
 #ifdef UPLINK
 		k+=snprintf(&buffer[k],len-k,",%u",uplink_counter);
@@ -695,9 +669,10 @@ uint16_t process_packet(char* buffer, uint16_t len, uint8_t format)
 
 		k+=snprintf(&buffer[k],15,"*%04X\n",crc);
 
-		k+=snprintf(&buff[k],3,"XX");
-		buff[k-1] = 0x80;
-		buff[k-2] = 0x80;
+		/* Mysterious footer */
+		buffer[k++] = 0x80;
+		buffer[k++] = 0x80;
+		buffer[k] = '\0';
 
         return k;
 	}
@@ -773,10 +748,15 @@ uint16_t process_packet(char* buffer, uint16_t len, uint8_t format)
 		cmp_write_map(&cmp,total_send);
 
 		cmp_write_uint(&cmp, 0);
+
 #ifdef TESTING
 		cmp_write_str(&cmp, "PAYIOAD", 7);
 #else
+#ifdef CALLSIGN_INT
+		cmp_write_sint(&cmp, CALLSIGN_INT);
+#else
 		cmp_write_str(&cmp, CALLSIGN_STR, (sizeof(CALLSIGN_STR)/sizeof(char))-1);
+#endif
 #endif
 
 		cmp_write_uint(&cmp, 20);
