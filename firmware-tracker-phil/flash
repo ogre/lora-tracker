@@ -135,6 +135,25 @@ then
 fi
 print "$_INFO_ Compiled."
 
+size=`arm-none-eabi-size ${binary} | sed -n 2p`
+
+size_text=`echo $size | grep -o -E '[0-9]+' | sed -n 1p`
+size_data=`echo $size | grep -o -E '[0-9]+' | sed -n 2p`
+size_bss=`echo $size | grep -o -E '[0-9]+' | sed -n 3p`
+
+size_flash=$(($size_text+$size_data))
+size_ram=$(($size_data+$size_bss))
+
+print "STM32F030F4: 4KB/16KB"
+part_flash=16384
+part_ram=4096
+
+percent_flash=$(((100*$size_flash)/$part_flash))
+percent_ram=$(((100*$size_ram)/$part_ram))
+
+print "Flash: ${size_flash}/${part_flash} (${percent_flash}%)"
+print "RAM:   ${size_ram}/${part_ram} (${percent_ram}%)"
+
 if ! programmer="`wait_for_black_magic`"; then
   return 1
 fi
