@@ -1,8 +1,6 @@
 #include <libopencm3/stm32/gpio.h>
 #include <libopencm3/stm32/spi.h>
 #include <libopencm3/stm32/rcc.h>
-#include "radio_config.h"
-
 
 #include "radio.h"
 
@@ -205,16 +203,12 @@ void radio_start_tx_rtty(char *data, rtty_baud_t baud, uint8_t deviation)
 
 	if (baud == BAUD_50)
 	{
-		s1.bitrate = 40000;
+		s1.bitrate = 40000; // 40000;
 		rtty_byte_oversample = 2;
 	}
-	else if (baud == BAUD_300)
+	else
 	{
-
-	}
-	else  //baud_600
-	{
-
+		return;
 	}
 
 	uint8_t mode = radio_read_single_reg(REG_OP_MODE);

@@ -80,7 +80,7 @@ SCRIPT_DIR	= $(OPENCM3_DIR)/scripts
 ###############################################################################
 # C flags
 
-CFLAGS		+= -Os -g
+CFLAGS		+= -Os -g -Werror
 CFLAGS		+= -Wextra -Wshadow -Wimplicit-function-declaration
 CFLAGS		+= -Wredundant-decls -Wmissing-prototypes -Wstrict-prototypes
 CFLAGS		+= -fno-common -ffunction-sections -fdata-sections
@@ -98,6 +98,10 @@ CXXFLAGS	+= -fno-common -ffunction-sections -fdata-sections
 CPPFLAGS	+= -MD
 CPPFLAGS	+= -Wall -Wundef
 CPPFLAGS	+= -I$(INCLUDE_DIR) $(DEFS)
+
+ifneq ($(CONFIG_DIR),)
+  CPPFLAGS += -I$(CONFIG_DIR)
+endif
 
 ###############################################################################
 # Linker flags

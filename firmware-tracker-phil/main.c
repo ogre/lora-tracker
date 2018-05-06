@@ -19,8 +19,7 @@ extern void initialise_monitor_handles(void);
 #include "radio.h"
 #include "cmp.h"
 #include "util.h"
-
-#include "payload_config.h"
+#include "config.h"
 
 #ifdef CUTDOWN
   #include "../cutdownpwd.h"
@@ -55,13 +54,6 @@ uint8_t find_diff_scaling(void);
 uint8_t find_diff_scaling_alt(void);
 void process_diffs(uint8_t scaling_factor,uint8_t scaling_factor_alt);
 void process_diff(uint8_t scaling_factor, int32_t start_val, int32_t* input_diff, int8_t* output_diff);
-void get_radiation(uint32_t* rad1, uint32_t* rad2, uint32_t* rad3, uint32_t* current);
-
-/* Radiation Sensor Connections */
-#define CLK_PORT GPIOA
-#define CLK_PIN GPIO9
-#define DAT_PORT GPIOA
-#define DAT_PIN GPIO10
 
 static uint8_t sentence_counter = 0;
 
@@ -230,7 +222,6 @@ void init (void)
 	RCC_CR &= ~(0x1F<<3); //trim the crystal down a little
 	RCC_CR |= 15<<3;
 
-
 	//adc
 	rcc_periph_clock_enable(RCC_ADC);
 	rcc_periph_clock_enable(RCC_GPIOA);
@@ -242,7 +233,7 @@ void init (void)
 	adc_set_operation_mode(ADC1, ADC_MODE_SCAN);
 //	adc_set_single_conversion_mode(ADC1);
 	adc_set_right_aligned(ADC1);
-	adc_set_sample_time_on_all_channels(ADC1, ADC_SMPTIME_013DOT5);
+	adc_set_sample_time_on_all_channels(ADC1, ADC_SMPTIME_239DOT5);
 	adc_set_regular_sequence(ADC1, 1, channel_array);
 	adc_set_resolution(ADC1, ADC_RESOLUTION_12BIT);
 	//adc_set_single_conversion_mode(ADC1);
@@ -419,10 +410,12 @@ void usart1_isr(void)
 
 int main(void)
 {
- 	radio_lora_settings_t s_lora;
+#ifdef HABPACK
 	uint16_t k;
+	radio_lora_settings_t s_lora;
 #ifdef UPLINK
  	uint8_t uplink_en = 1;
+#endif
 #endif
 
 	init();
@@ -490,6 +483,7 @@ int main(void)
 				radio_rtty_poll_buffer_refill();
 				_delay_ms(20);
 			}
+			/* RTTY Postamble */
 			_delay_ms(300);
 			radio_sleep();
 		}
@@ -648,8 +642,8 @@ uint16_t process_packet(char* buffer, uint16_t len, uint8_t format)
 	nvic_enable_irq(NVIC_USART1_IRQ);
 
 	uint32_t bv = ADC1_DR;
-	bv = bv * 6;
-	bv = bv / 10;
+	bv = bv * BATTV_MUL;
+	bv = bv / BATTV_DIV;
 	adc_start_conversion_regular(ADC1);
 	uint16_t k;
 
@@ -657,7 +651,15 @@ uint16_t process_packet(char* buffer, uint16_t len, uint8_t format)
     {
         /* ASCII RTTY */
 		uint16_t crc;
-		k = 7;
+
+		k = 0;
+		buff[k++] = 0x55;
+		buff[k++] = 0xAA;
+		buff[k++] = 0x55;
+		buff[k++] = 0x80;
+		buff[k++] = 0x80;
+		buff[k++] = 0x80;
+		buff[k++] = 0x80;
 
 #ifdef TESTING
 		k+=snprintf(&buffer[k],len-k,"$$PAYIOAD,%u,",payload_counter++);
@@ -677,7 +679,10 @@ uint16_t process_packet(char* buffer, uint16_t len, uint8_t format)
 			k+=snprintf(&buffer[k],len-k,",,,%u",
 					_sats);
 
-		k+=snprintf(&buffer[k],len-k,",%lu,%u",bv,uplink_counter);
+		k+=snprintf(&buffer[k],len-k,",%lu",bv);
+
+#ifdef UPLINK
+		k+=snprintf(&buffer[k],len-k,",%u",uplink_counter);
 #ifdef CUTDOWN
 		k+=snprintf(&buffer[k],len-k,",%u",cutdown_counter);
 		if (cutdown_status)
@@ -685,9 +690,14 @@ uint16_t process_packet(char* buffer, uint16_t len, uint8_t format)
 		else
 			k+=snprintf(&buffer[k],len-k,",ERR");
 #endif
-		crc = calculate_crc16(&buffer[2]);
+#endif
+		crc = calculate_crc16(&buffer[9]);
 
 		k+=snprintf(&buffer[k],15,"*%04X\n",crc);
+
+		k+=snprintf(&buff[k],3,"XX");
+		buff[k-1] = 0x80;
+		buff[k-2] = 0x80;
 
         return k;
 	}
@@ -713,7 +723,11 @@ uint16_t process_packet(char* buffer, uint16_t len, uint8_t format)
 #ifdef TESTING
 		cmp_write_str(&cmp, "PAYIOAD", 7);
 #else
+#ifdef CALLSIGN_INT
+		cmp_write_sint(&cmp, CALLSIGN_INT);
+#else
 		cmp_write_str(&cmp, CALLSIGN_STR, (sizeof(CALLSIGN_STR)/sizeof(char))-1);
+#endif
 #endif
 
 		cmp_write_uint(&cmp, 1);
