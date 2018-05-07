@@ -102,6 +102,9 @@ CPPFLAGS	+= -I$(INCLUDE_DIR) $(DEFS)
 ifneq ($(CONFIG_DIR),)
   CPPFLAGS += -I$(CONFIG_DIR)
 endif
+ifneq ($(ALMANAC_DIR),)
+  CPPFLAGS += -I$(ALMANAC_DIR)
+endif
 
 ###############################################################################
 # Linker flags

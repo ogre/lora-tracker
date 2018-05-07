@@ -20,6 +20,7 @@ extern void initialise_monitor_handles(void);
 #include "cmp.h"
 #include "util.h"
 #include "config.h"
+#include "gnss_almanac.h"
 
 #ifdef CUTDOWN
   #include "../cutdownpwd.h"
@@ -169,6 +170,15 @@ static void init_wdt(void)
 	IWDG_KR = 0xAAAA;
 	//6. Enable the IWDG by writing 0x0000 CCCC in the IWDG_KR.
 	IWDG_KR = 0xCCCC; */
+}
+
+static void gnss_almanac(void)
+{
+	#ifdef GNSS_ALMANAC_PRESENT
+
+	GNSS_SEND_ALMANAC();
+
+	#endif
 }
 
 static void gnss_configure(void)
@@ -398,6 +408,7 @@ int main(void)
 #endif
 
 	_delay_ms(200);
+	gnss_almanac();
 	gnss_configure();
 	radio_init();
 

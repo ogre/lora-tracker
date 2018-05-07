@@ -114,12 +114,29 @@ if [ ! -f ${payload_config_path}/config.h ]; then
   exit 1;
 fi
 
+gnss_almanac_dir=`almanac/update_almanac`
+gnss_almanac_state=$?;
+if [ ${gnss_almanac_state} -eq 0 ];
+then
+  print "$_INFO_ Latest Almanac Downloaded."
+elif [ ${gnss_almanac_state} -eq 1 ]; then
+  print "$_INFO_ Using existing Almanac ($((($(date "+%s")-${gnss_almanac_dir})/3600))h old)"
+elif [ ${gnss_almanac_state} -eq 2 ]; then
+  print "$_ERROR_ Failed to get Almanac, using blank template."
+fi
+
+if [ ! -f ${payload_config_path}/config.h ]; then
+  print "$_ERROR_ Config for payload ${payload} not found";
+  list_available_configs;
+  exit 1;
+fi
+
 if [ ! -f ${libopencm3}/lib/libopencm3_stm32f0.a ]; then
   print "$_INFO_ Compiling libopencm3.."
   cd ${libopencm3} && make clean &> /dev/null && make &> /dev/null;
   if [ $? -gt 0 ]
   then
-    print_err "$_ERROR_ Compilation failed"
+    print "$_ERROR_ Compilation failed"
     exit 1
   fi
   cd $source_dir;
@@ -127,10 +144,10 @@ fi
 
 print "$_INFO_ Compiling for payload: ${payload}"
   
-make clean && make CONFIG_DIR=${payload_config_path}
+make clean && make CONFIG_DIR=${payload_config_path} ALMANAC_DIR=almanac/${gnss_almanac_dir}/
 if [ $? -gt 0 ]
 then
-  print_err "$_ERROR_ Compilation failed"
+  print "$_ERROR_ Compilation failed"
   exit 1
 fi
 print "$_INFO_ Compiled."
