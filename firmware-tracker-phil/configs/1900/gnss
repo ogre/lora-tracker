@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+# Constellations to download aid data for: gps=GPS, glo=GLONASS, qzss=QZSS(Japanese)
+gnss_constellations="gps,glo"
+# Data types to download: eph=Ephemeris, alm=Almanac, pos=Position
+gnss_datatype="alm,pos"
+# Max Age of locally-cached data before redownloaded
+gnss_data_maxage=$((3*3600)) # 3 hours
+
+# Approximate initial position
+gnss_pos_latitude="50.6628" # Dartmoor
+gnss_pos_longitude="-4.1816" # Dartmoor
+gnss_pos_radius="400000" # 400km

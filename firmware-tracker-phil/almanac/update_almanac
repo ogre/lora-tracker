@@ -3,6 +3,8 @@
 source_dir="$(cd $(dirname ${BASH_SOURCE[0]}) && pwd)"
 cd $source_dir
 
+source ../configs/${1}/gnss
+
 current_timestamp=`date "+%s"`
 
 newest_almanac=0
@@ -28,22 +30,16 @@ then
 fi;
 shopt -u nullglob
 
-if (( (${current_timestamp} - ${newest_almanac}) > (6*3600) ));
+if (( (${current_timestamp} - ${newest_almanac}) > ${gnss_data_maxage} ));
 then
     source ./authtoken
-    gnss="gps,glo"
-    datatype="alm,pos"
-
-    # Dartmoor
-    latitude="50.6628"
-    longitude="-4.1816"
-    pos_accuracy="250000" # 250km
 
     aid_data_file=$(mktemp);
 
-    curl -s "http://online-live1.services.u-blox.com/GetOnlineData.ashx?token=${authtoken};gnss=${gnss};datatype=${datatype};lat=${latitude};lon=${longitude};pacc=${pos_accuracy}" -o ${aid_data_file}
+    curl -s "http://online-live1.services.u-blox.com/GetOnlineData.ashx?token=${authtoken};gnss=${gnss_constellations};datatype=${gnss_datatype};lat=${gnss_pos_latitude};lon=${gnss_pos_longitude};pacc=${gnss_pos_radius}" -o "${aid_data_file}"
     if [ $? -gt 0 ]
     then
+        # HTTP Failed
         if (( ${newest_almanac} == 0 ));
         then
             echo "blank";

@@ -114,7 +114,7 @@ if [ ! -f ${payload_config_path}/config.h ]; then
   exit 1;
 fi
 
-gnss_almanac_dir=`almanac/update_almanac`
+gnss_almanac_dir=`almanac/update_almanac "${payload}"`
 gnss_almanac_state=$?;
 if [ ${gnss_almanac_state} -eq 0 ];
 then
