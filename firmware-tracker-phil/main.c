@@ -30,7 +30,7 @@
 #define ABS(x)	((x < 0) ? -x : x)
 
 void _delay_ms(const uint32_t delay);
-void uart_send_blocking_len(uint8_t *buff, uint16_t len);
+void uart_send_blocking_len(const uint8_t *buff, uint16_t len);
 uint16_t process_packet(char* buffer, uint16_t len, uint8_t format);
 
 static uint8_t sentence_counter = 0;
@@ -76,7 +76,6 @@ volatile uint16_t gnss_message_id = 0;
 volatile char* gnss_buff_ptr = &gnss_buff[0];
 
 volatile uint8_t pos_updated = 0;
-volatile uint8_t gnss_status_updated = 0;
 
 volatile uint8_t fixtype = 0;
 volatile int32_t latitude = 0;
@@ -161,15 +160,15 @@ static void gnss_configure(void)
 	uint16_t ubloxcrc;
 
 	/* Configure flight mode */
-	uart_send_blocking_len((uint8_t*)flight_mode,44);
+	uart_send_blocking_len(flight_mode,44);
 
 	/* Disable NMEA Outputs */
-	uart_send_blocking_len((uint8_t*)disable_nmea_gpgga,16);
-	uart_send_blocking_len((uint8_t*)disable_nmea_gpgll,16);
-	uart_send_blocking_len((uint8_t*)disable_nmea_gpgsa,16);
-	uart_send_blocking_len((uint8_t*)disable_nmea_gpgsv,16);
-	uart_send_blocking_len((uint8_t*)disable_nmea_gprmc,16);
-	uart_send_blocking_len((uint8_t*)disable_nmea_gpvtg,16);
+	uart_send_blocking_len(disable_nmea_gpgga,16);
+	uart_send_blocking_len(disable_nmea_gpgll,16);
+	uart_send_blocking_len(disable_nmea_gpgsa,16);
+	uart_send_blocking_len(disable_nmea_gpgsv,16);
+	uart_send_blocking_len(disable_nmea_gprmc,16);
+	uart_send_blocking_len(disable_nmea_gpvtg,16);
 
 	/* Set GPS Nav Rate */
 	memcpy(buff, set_rate,12);
@@ -184,7 +183,7 @@ static void gnss_configure(void)
 	/* Enable UBX-NAV-PVT Output */
 	ubloxcrc = calculate_ublox_crc((uint8_t *)&enable_navpvt[2],16-4);
 
-	uart_send_blocking_len((uint8_t*)enable_navpvt,14);
+	uart_send_blocking_len(enable_navpvt,14);
 	usart_send_blocking(USART1,ubloxcrc>>8);
 	usart_send_blocking(USART1,ubloxcrc&0xFF);
 }
@@ -250,12 +249,12 @@ static void init(void)
 	//			GPIO2 | GPIO3);
 }
 
-void uart_send_blocking_len(uint8_t *_buff, uint16_t len)
+void uart_send_blocking_len(const uint8_t *_buff, uint16_t len)
 {
 	uint16_t i = 0;
 	for (i = 0; i < len; i++)
 	{
-		usart_send_blocking(USART1,*_buff++);
+		usart_send_blocking(USART1, _buff[i]);
 	}
 }
 
@@ -348,7 +347,6 @@ void usart1_isr(void)
 					}
 
 					sats = gnss_buff[23];
-					gnss_status_updated = 1;
 					pos_updated = 1;
 				}
 
@@ -395,7 +393,7 @@ int main(void)
 	{
 
 #ifndef ENABLE_GPS
-		gnss_status_updated = 1;
+		pos_updated = 1;
 #endif
 
 #ifdef CUTDOWN
@@ -403,13 +401,18 @@ int main(void)
 #endif
 
 		ms_countdown = 1000;
-		while((pos_updated == 0) && (gnss_status_updated == 0) && (ms_countdown)) {};
+		while((pos_updated == 0) && (ms_countdown > 0)) {};
 
-		if((pos_updated == 0) && (gnss_status_updated == 0))
+		if(pos_updated == 0)
 		{
-			/* Didn't receive position, so reconfigure GNSS */
+			/* Didn't receive message, so reconfigure GNSS */
 			gnss_configure();
 			/* then transmit old info anyway */
+		}
+		else if((fixtype != 2) && (fixtype != 3))
+		{
+			/* Got message but no fix, make sure that we've set flight mode */
+			uart_send_blocking_len((uint8_t*)flight_mode,44);
 		}
 
 		//WDT reset
@@ -603,9 +606,7 @@ uint16_t process_packet(char* buffer, uint16_t len, uint8_t format)
 	_sats = sats;
 
 	/* Reset GNSS status vars */
-	gnss_status_updated = 0;
 	pos_updated = 0;
-	gnss_status_updated = 0;
 
 	/* Re-enable UART IRQ */
 	nvic_enable_irq(NVIC_USART1_IRQ);
@@ -625,13 +626,13 @@ uint16_t process_packet(char* buffer, uint16_t len, uint8_t format)
 
 		k = 0;
 		/* Mysterious header */
-		buff[k++] = 0x55;
-		buff[k++] = 0xAA;
-		buff[k++] = 0x55;
-		buff[k++] = 0x80;
-		buff[k++] = 0x80;
-		buff[k++] = 0x80;
-		buff[k++] = 0x80;
+		buffer[k++] = 0x55;
+		buffer[k++] = 0xAA;
+		buffer[k++] = 0x55;
+		buffer[k++] = 0x80;
+		buffer[k++] = 0x80;
+		buffer[k++] = 0x80;
+		buffer[k++] = 0x80;
 
 #ifdef TESTING
 		k+=snprintf(&buffer[k],len-k,"$$PAYIOAD,%u,",payload_counter++);
