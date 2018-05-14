@@ -14,6 +14,7 @@
 //#define UPLINK          //enables/disables uplink after each lora packet
 //#define TESTING       //disables the WDT and sets a fake payload name (to prevent being accidently left enabled)
 //#define CUTDOWN       //checks the uplinked message when cutdown is needed
+//const char cutdown_text[] = "CUTDOWNpassword";
 //#define HABPACK
 //#define CALLING // Enables Transmission on calling Frequency
 //#define CALLING_FREQ    FREQ_433_650
@@ -34,3 +35,5 @@ static const uint8_t sentences_implicit[]  = {0,              };
 static const uint8_t sentences_coding[]    = {0,              };
 static const uint8_t sentences_spreading[] = {0,              };
 static const uint8_t sentences_bandwidth[] = {RTTY_SENTENCE,  };
+
+#define TOTAL_SENTENCES 1

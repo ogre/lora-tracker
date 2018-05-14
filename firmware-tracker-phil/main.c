@@ -12,22 +12,12 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <stdlib.h>
-
-extern void initialise_monitor_handles(void);
 
 #include "radio.h"
 #include "cmp.h"
 #include "util.h"
 #include "config.h"
 #include "gnss_almanac.h"
-
-#ifdef CUTDOWN
-  #include "../cutdownpwd.h"
-  /* The file needs to declare:
-    const char cutdown_text[] = "CUTDOWNpassword";
-  */
-#endif
 
 #if GPS_UBLOX_VERSION == 7
   #define GPS_NAVPVT_LEN	84
@@ -37,19 +27,11 @@ extern void initialise_monitor_handles(void);
   #error "You must select Ublox version (7/8) for NAV-PVT message."
 #endif
 
-#define TOTAL_SENTENCES (sizeof(sentences_coding)/sizeof(uint8_t))
-
 #define ABS(x)	((x < 0) ? -x : x)
 
-void init(void);
-void calibrate_hsi(void);
 void _delay_ms(const uint32_t delay);
 void uart_send_blocking_len(uint8_t *buff, uint16_t len);
 uint16_t process_packet(char* buffer, uint16_t len, uint8_t format);
-uint8_t find_diff_scaling(void);
-uint8_t find_diff_scaling_alt(void);
-void process_diffs(uint8_t scaling_factor,uint8_t scaling_factor_alt);
-void process_diff(uint8_t scaling_factor, int32_t start_val, int32_t* input_diff, int8_t* output_diff);
 
 static uint8_t sentence_counter = 0;
 
@@ -115,16 +97,10 @@ uint16_t cutdown_counter = 0;
 uint8_t cutdown_status = 0;
 
 #ifdef HABPACK
-//#define HB_BUF_LEN 100
-//uint8_t hb_buf[HB_BUF_LEN] = {0};
 uint8_t hb_buf_ptr = 0;
-
-static size_t file_writer(cmp_ctx_t *ctx, const void *data, size_t count) {
-
+static size_t file_writer(cmp_ctx_t *ctx, const void *data, size_t count)
+{
 	uint16_t i;
-	//if (hb_buf_ptr+count > HB_BUF_LEN)
-	//	return -1;
-
 	for (i = 0; i < count; i++)
 	{
 		((char*)ctx->buf)[hb_buf_ptr] = *((uint8_t*)data);
@@ -132,7 +108,6 @@ static size_t file_writer(cmp_ctx_t *ctx, const void *data, size_t count) {
 		hb_buf_ptr++;
 	}
 	return count;
-    //return fwrite(data, sizeof(uint8_t), count, (FILE *)ctx->buf);
 }
 #endif
 
@@ -214,7 +189,7 @@ static void gnss_configure(void)
 	usart_send_blocking(USART1,ubloxcrc&0xFF);
 }
 
-void init (void)
+static void init(void)
 {
 	rcc_clock_setup_in_hsi_out_48mhz();
 	rcc_periph_clock_enable(RCC_GPIOB);
@@ -279,8 +254,9 @@ void uart_send_blocking_len(uint8_t *_buff, uint16_t len)
 {
 	uint16_t i = 0;
 	for (i = 0; i < len; i++)
+	{
 		usart_send_blocking(USART1,*_buff++);
-
+	}
 }
 
 void sys_tick_handler(void)
@@ -291,7 +267,6 @@ void sys_tick_handler(void)
 
 void usart1_isr(void)
 {
-
 	if (((USART_ISR(USART1) & USART_ISR_RXNE) != 0))
 	{
 		uint8_t d = (uint8_t)USART1_RDR;
@@ -423,9 +398,6 @@ int main(void)
 		gnss_status_updated = 1;
 #endif
 
-		/* Set Flight Mode */
-		uart_send_blocking_len((uint8_t*)flight_mode,44);
-
 #ifdef CUTDOWN
 		cutdown_status = gpio_get(GPIOF,GPIO1) > 0;
 #endif
@@ -531,7 +503,6 @@ int main(void)
 #endif
 
 #ifdef UPLINK
-
 		if (uplink_en)// && !((payload_counter & 0x3) == 0x3))
 		{
 			radio_sleep();
@@ -553,7 +524,8 @@ int main(void)
 				//wait for packet
 				uint8_t count = 100;
 				_delay_ms(300);
-				while(count){
+				while(count)
+				{
 					_delay_ms(40);
 					uint8_t irq = radio_read_single_reg(REG_IRQ_FLAGS);
 					if (irq & (1<<6))
@@ -568,12 +540,15 @@ int main(void)
 							//parse uplinked text...
 							uint8_t cut = 1;
 							uint8_t cmp_ptr;
-							if ( r == (sizeof(cutdown_text)/sizeof(char))){
-								for (cmp_ptr = 0; cmp_ptr < r; cmp_ptr++){
+							if ( r == (sizeof(cutdown_text)/sizeof(char)))
+							{
+								for (cmp_ptr = 0; cmp_ptr < r; cmp_ptr++)
+								{
 									if (buff[cmp_ptr] != cutdown_text[cmp_ptr])
 										cut = 0;
 								}
-								if (cut){
+								if (cut)
+								{
 									cutdown_counter++;
 									gpio_mode_setup(GPIOF, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO1);  //FIRE!
 									gpio_clear(GPIOF,GPIO1);
@@ -587,7 +562,9 @@ int main(void)
 #endif
 					}
 					else
+					{
 						count--;
+					}
 				}
 			}
 
@@ -595,7 +572,9 @@ int main(void)
 			_delay_ms(10);
 		}
 		else
+		{
 			_delay_ms(50);
+		}
 #else
 		_delay_ms(50);
 #endif
@@ -606,34 +585,43 @@ int main(void)
 //format - 0 = UKHAS ASCII
 //         1 = HABpack
 //         2 = HABpack Calling Beacon
+static uint8_t _hour, _minute, _second, _sats;
+static int32_t _latitude, _longitude, _altitude;
+static uint32_t _bv;
 uint16_t process_packet(char* buffer, uint16_t len, uint8_t format)
 {
-	uint16_t k;
-
-	/* Copy out GPS data, disable IRQ while we do */
+	/* Disable UART IRQ */
 	nvic_disable_irq(NVIC_USART1_IRQ);
-	int32_t _latitude = latitude;
-	int32_t _longitude = longitude;
-	int32_t _altitude = altitude/1000;
-	uint8_t _hour = hour;
-	uint8_t _minute = minute;
-	uint8_t _second = second;
-	uint8_t _sats = sats;
+
+	/* Copy out GPS data */
+	_latitude = latitude;
+	_longitude = longitude;
+	_altitude = altitude/1000;
+	_hour = hour;
+	_minute = minute;
+	_second = second;
+	_sats = sats;
+
+	/* Reset GNSS status vars */
 	gnss_status_updated = 0;
 	pos_updated = 0;
 	gnss_status_updated = 0;
+
+	/* Re-enable UART IRQ */
 	nvic_enable_irq(NVIC_USART1_IRQ);
 
 	/* Read Battery Voltage */
-	uint32_t bv = ADC1_DR;
-	bv = bv * BATTV_MUL;
-	bv = bv / BATTV_DIV;
+	_bv = ADC1_DR;
+	_bv = _bv * BATTV_MUL;
+	_bv = _bv / BATTV_DIV;
+
+	/* Start new ADC conversion for next cycle */
 	adc_start_conversion_regular(ADC1);
 
 	if(format == 0)
     {
         /* ASCII RTTY */
-		uint16_t crc;
+		uint16_t k, crc;
 
 		k = 0;
 		/* Mysterious header */
@@ -667,7 +655,7 @@ uint16_t process_packet(char* buffer, uint16_t len, uint8_t format)
 					_sats);
 
 		k+=snprintf(&buffer[k],len-k,",%ld.%03ld",
-					bv / 1000, bv % 1000);
+					_bv / 1000, _bv % 1000);
 
 #ifdef UPLINK
 		k+=snprintf(&buffer[k],len-k,",%u",uplink_counter);
@@ -735,7 +723,7 @@ uint16_t process_packet(char* buffer, uint16_t len, uint8_t format)
 		cmp_write_uint(&cmp, _sats);
 
 		cmp_write_uint(&cmp, 6);
-		cmp_write_sint(&cmp, bv);
+		cmp_write_sint(&cmp, _bv);
 
 #ifdef UPLINK
 		cmp_write_uint(&cmp, 30);
