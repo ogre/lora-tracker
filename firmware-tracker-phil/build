@@ -62,7 +62,7 @@ then
 elif [ ${gnss_aid_state} -eq 1 ]; then
   print "$_INFO_ Using existing GNSS Aid File ($((($(date "+%s")-${gnss_aid_dir})/3600))h old)"
 elif [ ${gnss_aid_state} -eq 2 ]; then
-  print "$_ERROR_ Failed to get GNSS Aid File, using blank template."
+  print "$_INFO_ Warning: Failed to get GNSS Aid File, using blank template."
 fi
 
 if [ ! -f ${libopencm3}/lib/libopencm3_stm32f0.a ]; then

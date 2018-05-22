@@ -236,9 +236,9 @@ then
     gnss_aid_data+="#endif /* GNSS_AID_UBXOFFLINE */\\n";
 
     gnss_aid_data+="\\n";
-    gnss_aid_function+="_delay_ms(5);\\n\\n";
+    gnss_aid_function+="_delay_ms(5);\\n";
 
-    gnss_aid_data+="${gnss_aid_function}\\n"
+    gnss_aid_data+="${gnss_aid_function}"
 
     gnss_aid_data+="\\n";
 
