@@ -1,0 +1,251 @@
+#!/usr/bin/env bash
+
+source_dir="$(cd $(dirname ${BASH_SOURCE[0]}) && pwd)"
+cd $source_dir
+
+gnss_aid_constellations="gps,glo" # gps=GPS, glo=GLONASS
+gnss_aid_maxage=$((3*3600)) # 3 hours
+gnss_aid_ubxoffline_days=1
+
+prefix_time_aid="b562134018001000"
+#b562 1340 1800 1000 0012e20705070a2f3000806e51060a000000000000003aa7
+# 1340: UBX-MGA-INI
+# Length: 18 (dec: 24)
+# Type: 10.00 UBX-MGA-INI-TIME_UTC (Approximate Time)
+
+prefix_position_aid="b562134014000100"
+#b562 1340 1400 0100 0000a087321e40f081fd0000000040787d01c321
+# 1340: UBX-MGA-INI
+# Length: 14 (dec: 20)
+# Type: 01.00 UBX-MGA-INI-POS_LLH (Approximate Lat/Lon Position)
+
+prefix_gps_almanac="b562130024000200"
+#b562 1300 2400 0200 01002d3fd04e9d1243fdf00ca100864c9fffcf4d1900780ebfffcfffffff000000000547
+# 1300: UBX-MGA-GPS (GPS Ephemerides)
+# Length: 24 (dec: 36)
+# Type: 02.00 UBX-MGA-GPS-ALM (GPS Almanac)
+
+prefix_glonass_almanac="b562130624000200"
+#b562 1306 2400 0200 01005a030101faffec016447fdffce1a0000cbbd0200a53febffe30185e700000000bc6f
+# 1306: UBX-MGA-GLO (GLONASS Ephemerides)
+# Length: 24 (dec: 36)
+# Type: 02.00 UBX-MGA-GLO-ALM (GLONASS Almanac)
+
+prefix_gps_sv_health="b562130028000400"
+#b562 1300 2800 0400 00000000003f00000000000000000000000000000000000000000000000000000000000000007e93
+# 1300: UBX-MGA-GPS (GPS Ephemerides)
+# Type: 04.00 UBX-MGA-GPS-HEALTH (GPS SV Health)
+
+prefix_gps_ionosphere="b562130010000600"
+#b562 1300 1000 0600 00000703fffe2a06fff80000000057a1
+# 1300: UBX-MGA-GPS (GPS Ephemerides)
+# Type: 06.00 UBX-MGA-GPS-IONO (GPS Ionospheric Assistance)
+
+prefix_gps_utc_offset="b562130014000500"
+#b562 1300 1400 0500 0000ffffffff00000000124ed28907120000fc47
+# 1300: UBX-MGA-GPS (GPS Ephemerides)
+# Type: 05.00 UBX-MGA-GPS-UTC (GPS UTC Assistance)
+
+prefix_glonass_utc_offset="b562130614000300"
+#b562 1306 1400 0300 680302000000130000005600ccff00000000d140
+# 1306: UBX-MGA-GLO (GLONASS Ephemerides)
+# Type: 03.00 UBX-MGA-GLO-TIMEOFFSET (GLONASS Time Offset Assistance)
+
+prefix_eop="b562134048003000"
+#b562 1340 4800 3000 000000001825a67c0002083800004004fe1629f3ffff0000000000000000ad8eeca9bf1809b51d9023b4f23e9b3472c92d34ad8eeca9ee1f0f348ec39db687352fb44324a53405ca
+# 1340: UBX-MGA-INI (Initial Assistance)
+# Type: 30.00 UBX-MGA-INI-EOP (Earth Orientation Parameters)
+
+prefix_ubxoffline="b56213204c000000"
+#b562 1320 4c00 0000 01001205150cd20790fc00c0c23f2fff0fd89135000df498e1e3dc26074cda66080956c0fc1e1f18970f5c4500e0308dbb2842ae5e4e76d55dce4200ec21ab27d704a2eb98ce00000000eb07
+# 1320: UBX-MGA-ANO (AssistNow Offline)
+
+current_timestamp=`date "+%s"`
+
+newest_data=0
+
+shopt -s nullglob
+directories=( */ )
+if [[ ${#directories[@]} > 0 ]];
+then
+    shopt -u nullglob
+
+    for i in $(ls -d */ | cut -f1 -d'/');
+    do
+        candidate_data=${i%%/};
+        if [ -f ${candidate_data}/gnss_aid.h ];
+        then
+            data_age=$(((${current_timestamp}-${candidate_data})/3600))
+            if (( ${candidate_data} > ${newest_data} ));
+            then
+                newest_data=${candidate_data};
+            fi
+        fi
+    done
+fi;
+shopt -u nullglob
+
+aid_lines=""
+
+ubx_online_request() {
+    aid_data_file=$(mktemp);
+
+    source ./authtoken
+
+    curl -s "https://online-live1.services.u-blox.com/GetOnlineData.ashx?token=${authtoken};gnss=${gnss_aid_constellations};datatype=alm,aux" -o "${aid_data_file}"
+    if [ $? -lt 0 ]
+    then
+        # HTTP Failed
+        rm -f ${aid_data_file};
+        return 1;
+    fi
+
+    aid_lines+=`xxd -p ${aid_data_file} | tr -d '\n'| sed -e 's/b562/\nb562/g'`
+    rm -f ${aid_data_file};
+
+    return 0;
+}
+
+ubx_offline_request() {
+    aid_data_file=$(mktemp);
+
+    source ./authtoken
+
+    curl -s "https://offline-live1.services.u-blox.com/GetOfflineData.ashx?token=${authtoken};gnss=${gnss_aid_constellations};period=1;resolution=1" -o "${aid_data_file}"
+    if [ $? -lt 0 ]
+    then
+        # HTTP Failed
+        rm -f ${aid_data_file};
+        return 1;
+    fi
+
+    aid_lines+=`xxd -p ${aid_data_file} | tr -d '\n'| sed -e 's/b562/\nb562/g'`
+    rm -f ${aid_data_file};
+
+    return 0;
+}
+
+if (( $((${current_timestamp} - ${newest_data})) > ${gnss_aid_maxage} ));
+then
+
+    ubx_online_request;
+    if [ $? -ne 0 ];
+    then
+        if (( ${newest_data} == 0 ));
+        then
+            echo "blank";
+            exit 2;
+        else
+            echo "${newest_data}";
+            exit 1;
+        fi
+    fi
+
+    ubx_offline_request;
+    if [ $? -ne 0 ];
+    then
+        if (( ${newest_data} == 0 ));
+        then
+            echo "blank";
+            exit 2;
+        else
+            echo "${newest_data}";
+            exit 1;
+        fi
+    fi
+
+    data_timestamp=`date "+%s"`
+
+    # Filter lines
+    aid_lines_time=`echo -e "${aid_lines}" | grep -e ${prefix_time_aid}`
+    aid_lines_almanac=`echo -e "${aid_lines}" | grep -e ${prefix_gps_almanac} -e ${prefix_glonass_almanac}`
+    aid_lines_auxiliary=`echo -e "${aid_lines}" | grep -e ${prefix_gps_sv_health} -e ${prefix_gps_sv_health} \
+                                                    -e ${prefix_gps_utc_offset} -e ${prefix_glonass_utc_offset} \
+                                                    -e ${prefix_eop}`
+    aid_lines_ubxoffline=`echo -e "${aid_lines}" | grep -e ${prefix_ubxoffline}`
+
+    # Generate header file
+    gnss_aid_data="";
+    gnss_aid_function=""
+    gnss_aid_data+="#ifndef __GNSS_AID_H__\\n";
+    gnss_aid_data+="#define __GNSS_AID_H__\\n";
+    gnss_aid_data+="\\n";
+    gnss_aid_data+="// Downloaded: $(date -d "@${data_timestamp}" "+%Y-%m-%d %H:%M:%S")\\n";
+    gnss_aid_data+="\\n";
+
+    # Time aid - TODO (Should be dynamically generated at compile time)
+
+    # Almanac aid
+    gnss_aid_data+="#ifdef GNSS_AID_ALMANAC\\n";
+    gnss_aid_function+="#define GNSS_SEND_AID_ALMANAC() \x5C\\n"
+    i=0
+    while read -r line; do
+        line=`echo "${line}" |  sed -e 's/../0x\0, /g'`;
+        gnss_aid_data+="const uint8_t gnss_aid_almanac_${i}[] = { ${line} };\\n";
+        gnss_aid_function+="uart_send_blocking_len((uint8_t*)gnss_aid_almanac_${i}, $(echo "${line}" | tr -d -c 'x' | awk '{ print length; }')); \x5C\\n"
+        gnss_aid_function+="_delay_ms(5); \x5C\\n";
+        i=$(($i+1));
+    done <<< "${aid_lines_almanac}"
+    gnss_aid_data+="#endif /* GNSS_AID_ALMANAC */\\n";
+
+    gnss_aid_data+="\\n";
+    gnss_aid_function+="_delay_ms(5);\\n\\n";
+
+    # Auxiliary aid
+    gnss_aid_data+="#ifdef GNSS_AID_AUXILIARY\\n";
+    gnss_aid_function+="#define GNSS_SEND_AID_AUXILIARY() \x5C\\n"
+    i=0
+    while read -r line; do
+        line=`echo "${line}" |  sed -e 's/../0x\0, /g'`;
+        gnss_aid_data+="const uint8_t gnss_aid_auxiliary_${i}[] = { ${line} };\\n";
+        gnss_aid_function+="uart_send_blocking_len((uint8_t*)gnss_aid_auxiliary_${i}, $(echo "${line}" | tr -d -c 'x' | awk '{ print length; }')); \x5C\\n"
+        gnss_aid_function+="_delay_ms(5); \x5C\\n";
+        i=$(($i+1));
+    done <<< "${aid_lines_auxiliary}"
+    gnss_aid_data+="#endif /* GNSS_AID_AUXILIARY */\\n";
+
+    gnss_aid_data+="\\n";
+    gnss_aid_function+="_delay_ms(5);\\n\\n";
+
+    # UBX Offline aid
+    gnss_aid_data+="#ifdef GNSS_AID_UBXOFFLINE\\n";
+    gnss_aid_function+="#define GNSS_SEND_AID_UBXOFFLINE() \x5C\\n"
+    i=0
+    last_day=$((`date +%d`+${gnss_aid_ubxoffline_days}));
+    while read -r line; do
+        line_day=$((16#${line:24:2}));
+        if [ ${line_day} -lt ${last_day} ];
+        then
+            line=`echo "${line}" |  sed -e 's/../0x\0, /g'`;
+            gnss_aid_data+="const uint8_t gnss_aid_ubxoffline_${i}[] = { ${line} };\\n";
+            gnss_aid_function+="uart_send_blocking_len((uint8_t*)gnss_aid_ubxoffline_${i}, $(echo "${line}" | tr -d -c 'x' | awk '{ print length; }')); \x5C\\n"
+            gnss_aid_function+="_delay_ms(5); \x5C\\n";
+        fi
+        i=$(($i+1));
+    done <<< "${aid_lines_ubxoffline}"
+    gnss_aid_data+="#endif /* GNSS_AID_UBXOFFLINE */\\n";
+
+    gnss_aid_data+="\\n";
+    gnss_aid_function+="_delay_ms(5);\\n\\n";
+
+    gnss_aid_data+="${gnss_aid_function}\\n"
+
+    gnss_aid_data+="\\n";
+
+    gnss_aid_data+="#endif /* __GNSS_AID_H__ */";
+
+    mkdir "${data_timestamp}/";
+    echo -e "${gnss_aid_data}" >> "${data_timestamp}/gnss_aid.h";
+    
+    echo "${data_timestamp}";
+    exit 0;
+else
+    if (( ${newest_data} == 0 ));
+    then
+        echo "blank";
+        exit 2;
+    else
+        echo "${newest_data}";
+        exit 1;
+    fi
+fi

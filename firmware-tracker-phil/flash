@@ -115,16 +115,16 @@ if [ ! -f ${payload_config_path}/config.h ]; then
 fi
 print "$_INFO_ Using payload config: ${payload_config_path}"
 
-echo -ne "$_INFO_ Downloading Almanac... \r"
-gnss_almanac_dir=`almanac/update_almanac "${payload}"`
-gnss_almanac_state=$?;
-if [ ${gnss_almanac_state} -eq 0 ];
+echo -ne "$_INFO_ Downloading GNSS Aid File... \r"
+gnss_aid_dir=`gnss_aid/update_gnss_aid "${payload}"`
+gnss_aid_state=$?;
+if [ ${gnss_aid_state} -eq 0 ];
 then
-  print "$_INFO_ Latest Almanac Downloaded."
-elif [ ${gnss_almanac_state} -eq 1 ]; then
-  print "$_INFO_ Using existing Almanac ($((($(date "+%s")-${gnss_almanac_dir})/3600))h old)"
-elif [ ${gnss_almanac_state} -eq 2 ]; then
-  print "$_ERROR_ Failed to get Almanac, using blank template."
+  print "$_INFO_ Latest GNSS Aid File Downloaded."
+elif [ ${gnss_aid_state} -eq 1 ]; then
+  print "$_INFO_ Using existing GNSS Aid File ($((($(date "+%s")-${gnss_aid_dir})/3600))h old)"
+elif [ ${gnss_aid_state} -eq 2 ]; then
+  print "$_ERROR_ Failed to get GNSS Aid File, using blank template."
 fi
 
 if [ ! -f ${libopencm3}/lib/libopencm3_stm32f0.a ]; then
@@ -140,7 +140,7 @@ if [ ! -f ${libopencm3}/lib/libopencm3_stm32f0.a ]; then
 fi
 
 echo -ne "$_INFO_ Compiling firmware... \r"  
-make clean && make CONFIG_DIR=${payload_config_path} ALMANAC_DIR=almanac/${gnss_almanac_dir}/
+make clean && make CONFIG_DIR=${payload_config_path} ALMANAC_DIR=gnss_aid/${gnss_aid_dir}/
 if [ $? -gt 0 ]
 then
   print "$_ERROR_ Failed to compile firmware"

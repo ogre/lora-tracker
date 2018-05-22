@@ -17,7 +17,7 @@
 #include "cmp.h"
 #include "util.h"
 #include "config.h"
-#include "gnss_almanac.h"
+#include "gnss_aid.h"
 
 #if GPS_UBLOX_VERSION == 7
   #define GPS_NAVPVT_LEN	84
@@ -146,12 +146,22 @@ static void init_wdt(void)
 	IWDG_KR = 0xCCCC; */
 }
 
-static void gnss_almanac(void)
+static void gnss_aid(void)
 {
-	#ifdef GNSS_ALMANAC_PRESENT
+	#ifdef GNSS_AID_POSITION
+		uart_send_blocking_len((uint8_t*)gnss_aid_position_msg, gnss_aid_position_msg_length);
+	#endif
 
-	GNSS_SEND_ALMANAC();
+	#ifdef GNSS_AID_ALMANAC
+		GNSS_SEND_AID_ALMANAC();
+	#endif
 
+	#ifdef GNSS_AID_AUXILIARY
+		GNSS_SEND_AID_AUXILIARY();
+	#endif
+
+	#ifdef GNSS_AID_UBXOFFLINE
+		GNSS_SEND_AID_UBXOFFLINE();
 	#endif
 }
 
@@ -381,7 +391,7 @@ int main(void)
 #endif
 
 	_delay_ms(200);
-	gnss_almanac();
+	gnss_aid();
 	gnss_configure();
 	radio_init();
 
