@@ -328,7 +328,6 @@ void radio_init()
 	spi_init_master(R_SPI, SPI_CR1_BAUDRATE_FPCLK_DIV_64,
 			SPI_CR1_CPOL_CLK_TO_0_WHEN_IDLE,
 			SPI_CR1_CPHA_CLK_TRANSITION_1,
-			SPI_CR1_CRCL_8BIT,
 			SPI_CR1_MSBFIRST);
 
 	// Trigger an RXNE event when we have 8 bits (one byte) in the buffer
