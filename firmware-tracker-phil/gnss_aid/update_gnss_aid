@@ -90,8 +90,6 @@ aid_lines=""
 ubx_online_request() {
     aid_data_file=$(mktemp);
 
-    source ./authtoken
-
     curl -s "https://online-live1.services.u-blox.com/GetOnlineData.ashx?token=${authtoken};gnss=${gnss_aid_constellations};datatype=alm,aux" -o "${aid_data_file}"
     if [ $? -lt 0 ]
     then
@@ -109,8 +107,6 @@ ubx_online_request() {
 ubx_offline_request() {
     aid_data_file=$(mktemp);
 
-    source ./authtoken
-
     curl -s "https://offline-live1.services.u-blox.com/GetOfflineData.ashx?token=${authtoken};gnss=${gnss_aid_constellations};period=1;resolution=1" -o "${aid_data_file}"
     if [ $? -lt 0 ]
     then
@@ -127,6 +123,20 @@ ubx_offline_request() {
 
 if (( $((${current_timestamp} - ${newest_data})) > ${gnss_aid_maxage} ));
 then
+
+    if [ ! -f ./authtoken ];
+    then
+        if (( ${newest_data} == 0 ));
+        then
+            echo "blank";
+            exit 2;
+        else
+            echo "${newest_data}";
+            exit 1;
+        fi
+    fi
+
+    source ./authtoken
 
     ubx_online_request;
     if [ $? -ne 0 ];
