@@ -64,8 +64,7 @@ void radio_sleep(void);
 void radio_standby(void);
 void radio_set_single_rx(void);
 
-
-
+#define RTTY_SENTENCE 0xFF
 
 #define CODING_4_5 (0x1 << 1)
 #define CODING_4_6 (0x2 << 1)

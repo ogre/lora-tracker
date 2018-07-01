@@ -105,60 +105,11 @@ then
   exit 1;
 fi
 
-payload=$1
-payload_config_path="configs/${payload}/"
-
-if [ ! -f ${payload_config_path}/config.h ]; then
-  print "$_ERROR_ Config for payload ${payload} not found";
-  list_available_configs;
-  exit 1;
-fi
-print "$_INFO_ Using payload config: ${payload_config_path}"
-
-echo -ne "$_INFO_ Downloading GNSS Aid File... \r"
-gnss_aid_dir=`gnss_aid/update_gnss_aid "${payload}"`
-gnss_aid_state=$?;
-if [ ${gnss_aid_state} -eq 0 ];
-then
-  print "$_INFO_ Latest GNSS Aid File Downloaded."
-elif [ ${gnss_aid_state} -eq 1 ]; then
-  print "$_INFO_ Using existing GNSS Aid File ($((($(date "+%s")-${gnss_aid_dir})/3600))h old)"
-elif [ ${gnss_aid_state} -eq 2 ]; then
-  print "$_INFO_ Warning: Failed to get GNSS Aid File, using blank template."
-fi
-
-if [ ! -f ${libopencm3}/lib/libopencm3_stm32f0.a ]; then
-  echo -ne "$_INFO_ Compiling libopencm3... \r"
-  cd ${libopencm3} && make clean &> /dev/null && make &> /dev/null;
-  if [ $? -gt 0 ]
-  then
-    print "$_ERROR_ Failed to compile libopencm3"
-    exit 1
-  fi
-  print "$_INFO_ Compiled libopencm3.     "
-  cd $source_dir;
-fi
-
-echo -ne "$_INFO_ Compiling firmware... \r"  
-make clean && make CONFIG_DIR=${payload_config_path} ALMANAC_DIR=gnss_aid/${gnss_aid_dir}/
+./build "$1"
 if [ $? -gt 0 ]
 then
-  print "$_ERROR_ Failed to compile firmware"
   exit 1
 fi
-echo -e "$_INFO_ Compiled firmware.      "
-
-size=`arm-none-eabi-size ${binary} | sed -n 2p`
-
-size_text=`echo $size | grep -o -E '[0-9]+' | sed -n 1p`
-size_data=`echo $size | grep -o -E '[0-9]+' | sed -n 2p`
-size_bss=`echo $size | grep -o -E '[0-9]+' | sed -n 3p`
-
-size_flash=$(($size_text+$size_data))
-size_ram=$(($size_data+$size_bss))
-
-printf "RAM Usage: %5s B\n" ${size_ram}
-printf "ROM Usage: %5s B\n" ${size_flash}
 
 echo -ne "$_INFO_ Searching for programmer... \r"
 if ! programmer="`wait_for_black_magic`"; then
@@ -171,14 +122,24 @@ if ! part_id=`wait_for_part_id`; then
   print "$_ERROR_ Unable to get part_id"
   return 1
 fi
+
+size=`arm-none-eabi-size ${binary} | sed -n 2p`
+
+size_text=`echo $size | grep -o -E '[0-9]+' | sed -n 1p`
+size_data=`echo $size | grep -o -E '[0-9]+' | sed -n 2p`
+size_bss=`echo $size | grep -o -E '[0-9]+' | sed -n 3p`
+
+size_flash=$(($size_text+$size_data))
+size_ram=$(($size_data+$size_bss))
+
 if [ "${part_id}" == "4464001000" ];
 then
   print "$_INFO_ Detected STM32F030F4: 4KB/16KB"
   part_ram=4096
   part_flash=16384
 
-  printf "RAM Usage: %5s / %5s B (%s%%)\n" ${size_ram} ${part_ram} $(((100*$size_flash)/$part_flash))
-  printf "ROM Usage: %5s / %5s B (%s%%)\n" ${size_flash} ${part_flash} $(((100*$size_ram)/$part_ram))
+  printf "RAM Usage: %5s / %5s B (%s%%)\n" ${size_ram} ${part_ram} $(((100*$size_ram)/$part_ram))
+  printf "ROM Usage: %5s / %5s B (%s%%)\n" ${size_flash} ${part_flash} $(((100*$size_flash)/$part_flash))
 else
   print "$_ERROR_ Unknown STM32 Part ID: ${part_id}"  
 fi
