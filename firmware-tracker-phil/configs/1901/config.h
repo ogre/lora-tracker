@@ -14,9 +14,10 @@
 
 //#define GNSS_AID_TIME
 #define GNSS_AID_POSITION
-// Dartmoor: 50.6628, -4.1816, 400km radius
-const uint8_t gnss_aid_position_msg[] = { 0xb5, 0x62, 0x13, 0x40, 0x14, 0x00, 0x01, 0x00, 0x00, 0x00, 0xa0, 0x87, 0x32, 0x1e, 0x40, 0xf0, 0x81, 0xfd, 0x00, 0x00, 0x00, 0x00, 0x00, 0x5a, 0x62, 0x02, 0x4b, 0x92 };
-const uint32_t gnss_aid_position_msg_length = sizeof(gnss_aid_position_msg);
+const int32_t gnss_aid_position_latitude    = 506628000; // 50.6628 (1e-7)
+const int32_t gnss_aid_position_longitude   = -41816000; // -4.1816 (1e-7)
+const int32_t gnss_aid_position_altitude    =         0; // 0 (cm)
+const int32_t gnss_aid_position_stddev      =  40000000; // 400km (cm)
 #define GNSS_AID_ALMANAC
 #define GNSS_AID_AUXILIARY
 //#define GNSS_AID_UBXOFFLINE

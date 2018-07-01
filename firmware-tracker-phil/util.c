@@ -32,14 +32,14 @@ uint16_t calculate_crc16 (char *input)
 	return crc;
 }
 
-uint16_t calculate_ublox_crc(uint8_t *input, uint16_t len)
+uint16_t calculate_ublox_crc(const uint8_t *input, uint16_t len)
 {
 	uint8_t a = 0;
 	uint8_t b = 0;
 	uint16_t i;
 	for (i=0;i<len;i++)
 	{
-		a = a + *input++;
+		a = a + input[i];
 		b = b + a;
 	}
 	return (a << 8) | b;

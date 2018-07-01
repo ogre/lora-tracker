@@ -31,6 +31,7 @@
 
 void _delay_ms(const uint32_t delay);
 void uart_send_blocking_len(const uint8_t *buff, uint16_t len);
+void uart_send_blocking_len_ubx(const uint8_t *_buff, uint16_t len);
 uint16_t process_packet(char* buffer, uint16_t len, uint8_t format);
 
 static uint8_t sentence_counter = 0;
@@ -39,9 +40,8 @@ char buff[150] = {0};
 
 char gnss_buff[255] = {0};
 
-//len = 44
 const uint8_t flight_mode[] = 
-	{   0xB5, 0x62,
+	{
 		0x06, 0x24, // UBX-CFG-NAV5
 	    0x24, 0x00, // Length 
 	    0xFF, 0xFF, // Bitmask
@@ -62,45 +62,53 @@ const uint8_t flight_mode[] =
 	    0x10, 0x27, // Reserved
 	    0x00, 0x00, // Static Hold Distance Threshold
 	    0x00, // UTC Standard (Automatic)
-	    0x00, 0x00, 0x00, 0x00, 0x00,
-	    0x4D, 0xDB // Checksum
+	    0x00, 0x00, 0x00, 0x00, 0x00
 	};
 
 //len = 8
-//const uint8_t flight_mode_poll[] = {0xB5, 0x62, 0x06, 0x24, 0x00, 0x00, 0x2A, 0x84};
+//const uint8_t flight_mode_poll[] = {0x06, 0x24, 0x00, 0x00};
 
-//len = 16
 const uint8_t sbas_egnos_mode[] =
-	{	0xB5, 0x62,
+	{
 		0x06, 0x16, // UBX-CFG-SBAS
 		0x08, 0x00, // Length
 		0x01, // Mode (enabled)
 		0x07, // Usage (range, corrections, integrity)
 		0x03, // SBAS Channels (3, field obselete)
-		0x00, 0x51, 0x08, 0x00, 0x00, // PRN Bitmask (EGNOS-only)
-		0x88, 0x31 // Checksum
+		0x00, 0x51, 0x08, 0x00, 0x00 // PRN Bitmask (EGNOS-only)
 	};
 
-//len = 16
-const uint8_t disable_nmea_gpgga[] = {0xB5, 0x62, 0x06, 0x01, 0x08, 0x00, 0xF0, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0x23};
-const uint8_t disable_nmea_gpgll[] = {0xB5, 0x62, 0x06, 0x01, 0x08, 0x00, 0xF0, 0x01,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2A};
-const uint8_t disable_nmea_gpgsa[] = {0xB5, 0x62, 0x06, 0x01, 0x08, 0x00, 0xF0, 0x02,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x31};
-const uint8_t disable_nmea_gpgsv[] = {0xB5, 0x62, 0x06, 0x01, 0x08, 0x00, 0xF0, 0x03,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x38};
-const uint8_t disable_nmea_gprmc[] = {0xB5, 0x62, 0x06, 0x01, 0x08, 0x00, 0xF0, 0x04,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x3F};
-const uint8_t disable_nmea_gpvtg[] = {0xB5, 0x62, 0x06, 0x01, 0x08, 0x00, 0xF0, 0x05,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x46};
+uint8_t gnss_aid_position_msg[] =
+	{
+	    0x13, 0x40, // UBX-MGA-INI
+	    0x14, 0x00, // Length
+	    0x01, // Type: UBX-MGA-INI-POS_LLH
+	    0x00, // Version: 0
+	    0x00, 0x00, // Reserved
+	    0x00, 0x00, 0x00, 0x00, // Latitude 1e-7
+	    0x00, 0x00, 0x00, 0x00, // Longitude 1e-7
+	    0x00, 0x00, 0x00, 0x00, // Altitude cm
+	    0x00, 0x00, 0x00, 0x00  // Std Dev cm
+    };
 
-//len = 16
-const uint8_t enable_navpvt[] = {0xB5, 0x62, 0x06, 0x01, 0x08, 0x00, 0x01, 0x07, 0x00,
-		0x01, 0x00, 0x00, 0x00, 0x00, 0x18, 0xE1};
-//len = 14
-const uint8_t set_rate[] = {0xB5, 0x62, 0x06, 0x08, 0x06, 0x00, 0xF4, 0x01, 0x01, 0x00,
-		0x00, 0x00, 0x0A, 0x75};
+const uint8_t disable_nmea_gpgga[] = {0x06, 0x01, 0x08, 0x00, 0xF0, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+const uint8_t disable_nmea_gpgll[] = {0x06, 0x01, 0x08, 0x00, 0xF0, 0x01,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+const uint8_t disable_nmea_gpgsa[] = {0x06, 0x01, 0x08, 0x00, 0xF0, 0x02,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+const uint8_t disable_nmea_gpgsv[] = {0x06, 0x01, 0x08, 0x00, 0xF0, 0x03,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+const uint8_t disable_nmea_gprmc[] = {0x06, 0x01, 0x08, 0x00, 0xF0, 0x04,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+const uint8_t disable_nmea_gpvtg[] = {0x06, 0x01, 0x08, 0x00, 0xF0, 0x05,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+uint8_t gnss_nav_set_rate[] = {0x06, 0x08, 0x06, 0x00, 0xF4, 0x01, 0x01, 0x00,
+		0x00, 0x00};
+
+const uint8_t enable_navpvt[] = {0x06, 0x01, 0x08, 0x00, 0x01, 0x07, 0x00,
+		0x01, 0x00, 0x00, 0x00, 0x00};
 
 
 volatile uint16_t gnss_string_count = 0; //0 - not in string, >=1 - in string
@@ -182,7 +190,12 @@ static void init_wdt(void)
 static void gnss_aid(void)
 {
 	#ifdef GNSS_AID_POSITION
-		uart_send_blocking_len((uint8_t*)gnss_aid_position_msg, gnss_aid_position_msg_length);
+		memcpy(&gnss_aid_position_msg[8], &gnss_aid_position_latitude, sizeof(int32_t));
+	    memcpy(&gnss_aid_position_msg[12], &gnss_aid_position_longitude, sizeof(int32_t));
+	    memcpy(&gnss_aid_position_msg[16], &gnss_aid_position_altitude, sizeof(int32_t));
+	    memcpy(&gnss_aid_position_msg[20], &gnss_aid_position_stddev, sizeof(int32_t));
+
+		uart_send_blocking_len_ubx(gnss_aid_position_msg, sizeof(gnss_aid_position_msg));
 	#endif
 
 	#ifdef GNSS_AID_ALMANAC
@@ -200,38 +213,27 @@ static void gnss_aid(void)
 
 static void gnss_configure(void)
 {
-	uint16_t ubloxcrc;
-
 	/* Configure flight mode */
-	uart_send_blocking_len(flight_mode,44);
+	uart_send_blocking_len_ubx(flight_mode, sizeof(flight_mode));
 
 	/* Configure SBAS for EGNOS-only */
-	uart_send_blocking_len(sbas_egnos_mode,16);
+	uart_send_blocking_len_ubx(sbas_egnos_mode, sizeof(sbas_egnos_mode));
 
 	/* Disable NMEA Outputs */
-	uart_send_blocking_len(disable_nmea_gpgga,16);
-	uart_send_blocking_len(disable_nmea_gpgll,16);
-	uart_send_blocking_len(disable_nmea_gpgsa,16);
-	uart_send_blocking_len(disable_nmea_gpgsv,16);
-	uart_send_blocking_len(disable_nmea_gprmc,16);
-	uart_send_blocking_len(disable_nmea_gpvtg,16);
+	uart_send_blocking_len_ubx(disable_nmea_gpgga, sizeof(disable_nmea_gpgga));
+	uart_send_blocking_len_ubx(disable_nmea_gpgll, sizeof(disable_nmea_gpgll));
+	uart_send_blocking_len_ubx(disable_nmea_gpgsa, sizeof(disable_nmea_gpgsa));
+	uart_send_blocking_len_ubx(disable_nmea_gpgsv, sizeof(disable_nmea_gpgsv));
+	uart_send_blocking_len_ubx(disable_nmea_gprmc, sizeof(disable_nmea_gprmc));
+	uart_send_blocking_len_ubx(disable_nmea_gpvtg, sizeof(disable_nmea_gpvtg));
 
 	/* Set GPS Nav Rate */
-	memcpy(buff, set_rate,12);
-	buff[6] = GPS_UPDATE_PERIOD & 0xFF;
-	buff[7] = (GPS_UPDATE_PERIOD >> 8) & 0xFF;
-	ubloxcrc = calculate_ublox_crc((uint8_t*)&buff[2],10);
-
-	uart_send_blocking_len((uint8_t*)buff,12);
-	usart_send_blocking(USART1,ubloxcrc>>8);
-	usart_send_blocking(USART1,ubloxcrc&0xFF);
+	gnss_nav_set_rate[4] = GPS_UPDATE_PERIOD & 0xFF;
+	gnss_nav_set_rate[5] = (GPS_UPDATE_PERIOD >> 8) & 0xFF;
+	uart_send_blocking_len_ubx(gnss_nav_set_rate, sizeof(gnss_nav_set_rate));
 
 	/* Enable UBX-NAV-PVT Output */
-	ubloxcrc = calculate_ublox_crc((uint8_t *)&enable_navpvt[2],16-4);
-
-	uart_send_blocking_len(enable_navpvt,14);
-	usart_send_blocking(USART1,ubloxcrc>>8);
-	usart_send_blocking(USART1,ubloxcrc&0xFF);
+	uart_send_blocking_len_ubx(enable_navpvt, sizeof(enable_navpvt));
 }
 
 static void init(void)
@@ -297,11 +299,26 @@ static void init(void)
 
 void uart_send_blocking_len(const uint8_t *_buff, uint16_t len)
 {
-	uint16_t i = 0;
+	uint16_t i;
 	for (i = 0; i < len; i++)
 	{
 		usart_send_blocking(USART1, _buff[i]);
 	}
+}
+
+void uart_send_blocking_len_ubx(const uint8_t *_buff, uint16_t len)
+{
+    uint16_t i;
+    uint16_t checksum;
+    checksum = calculate_ublox_crc(_buff, len);
+    usart_send_blocking(USART1, 0xb5);
+    usart_send_blocking(USART1, 0x62);
+    for (i = 0; i < len; i++)
+    {
+        usart_send_blocking(USART1, _buff[i]);
+    }
+    usart_send_blocking(USART1, (checksum >> 8) & 0xFF);
+    usart_send_blocking(USART1, checksum & 0xFF);
 }
 
 void sys_tick_handler(void)
