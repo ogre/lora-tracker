@@ -181,9 +181,8 @@ then
     gnss_aid_data+="#define __GNSS_AID_H__\\n";
     gnss_aid_data+="\\n";
     gnss_aid_data+="// Downloaded: $(date -d "@${data_timestamp}" "+%Y-%m-%d %H:%M:%S")\\n";
+    gnss_aid_data+="#define GNSS_AID_TIMESTAMP ${data_timestamp}\\n";
     gnss_aid_data+="\\n";
-
-    # Time aid - TODO (Should be dynamically generated at compile time)
 
     # Almanac aid
     gnss_aid_data+="#ifdef GNSS_AID_ALMANAC\\n";

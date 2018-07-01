@@ -65,6 +65,11 @@ elif [ ${gnss_aid_state} -eq 2 ]; then
   print "$_INFO_ Warning: Failed to get GNSS Aid File, using blank template."
 fi
 
+config_test="$(mktemp)"
+gcc configs/test.c -I ${payload_config_path} -I gnss_aid/${gnss_aid_dir}/ -o ${config_test}
+${config_test}
+rm -f ${config_test}
+
 if [ ! -f ${libopencm3}/lib/libopencm3_stm32f0.a ]; then
   echo -ne "$_INFO_ Compiling libopencm3... \r"
   cd ${libopencm3} && make clean &> /dev/null && make &> /dev/null;
