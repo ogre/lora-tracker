@@ -53,16 +53,16 @@ if [ ! -f ${payload_config_path}/config.h ]; then
 fi
 print "$_INFO_ Using payload config: ${payload_config_path}"
 
-echo -ne "$_INFO_ Downloading GNSS Aid File... \r"
+echo -ne "$_INFO_ Downloading GNSS Aid Data... \r"
 gnss_aid_dir=`gnss_aid/update_gnss_aid "${payload}"`
 gnss_aid_state=$?;
 if [ ${gnss_aid_state} -eq 0 ];
 then
-  print "$_INFO_ Latest GNSS Aid File Downloaded."
+  print "$_INFO_ Latest GNSS Aid Data Downloaded."
 elif [ ${gnss_aid_state} -eq 1 ]; then
-  print "$_INFO_ Using existing GNSS Aid File ($((($(date "+%s")-${gnss_aid_dir})/3600))h old)"
+  print "$_INFO_ Using existing GNSS Aid Data"
 elif [ ${gnss_aid_state} -eq 2 ]; then
-  print "$_INFO_ Warning: Failed to get GNSS Aid File, using blank template."
+  print "$_INFO_ Warning: Failed to get GNSS Aid Data, using blank template."
 fi
 
 config_test="$(mktemp)"
