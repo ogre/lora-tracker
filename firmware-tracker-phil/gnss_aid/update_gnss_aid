@@ -220,7 +220,8 @@ then
     gnss_aid_data+="#ifdef GNSS_AID_UBXOFFLINE\\n";
     gnss_aid_function+="#define GNSS_SEND_AID_UBXOFFLINE() \x5C\\n"
     i=0
-    last_day=$((`date +%d`+${gnss_aid_ubxoffline_days}));
+    current_day=
+    last_day=$((10#`date +%d`+${gnss_aid_ubxoffline_days}));
     while read -r line; do
         line_day=$((16#${line:24:2}));
         if [ ${line_day} -lt ${last_day} ];
