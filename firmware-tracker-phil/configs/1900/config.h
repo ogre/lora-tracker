@@ -14,10 +14,10 @@
 
 //#define GNSS_AID_TIME
 #define GNSS_AID_POSITION
-const int32_t gnss_aid_position_latitude    = 506628000; // 50.6628 (1e-7)
-const int32_t gnss_aid_position_longitude   = -41816000; // -4.1816 (1e-7)
-const int32_t gnss_aid_position_altitude    =         0; // 0 (cm)
-const int32_t gnss_aid_position_stddev      =  40000000; // 400km (cm)
+const int32_t gnss_aid_position_latitude    = (50.0479 / 1e-7);
+const int32_t gnss_aid_position_longitude   = (-5.1817 / 1e-7);
+const int32_t gnss_aid_position_altitude    =              (0); // 0 (cm)
+const int32_t gnss_aid_position_stddev      =     (199 / 1e-5); // 199km
 #define GNSS_AID_ALMANAC
 #define GNSS_AID_AUXILIARY
 //#define GNSS_AID_UBXOFFLINE
