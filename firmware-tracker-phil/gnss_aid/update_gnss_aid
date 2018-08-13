@@ -91,7 +91,7 @@ ubx_online_request() {
     aid_data_file=$(mktemp);
 
     curl -s "https://online-live1.services.u-blox.com/GetOnlineData.ashx?token=${authtoken};gnss=${gnss_aid_constellations};datatype=alm,aux" -o "${aid_data_file}"
-    if [ $? -lt 0 ]
+    if [ $? -gt 0 ]
     then
         # HTTP Failed
         rm -f ${aid_data_file};
@@ -108,7 +108,7 @@ ubx_offline_request() {
     aid_data_file=$(mktemp);
 
     curl -s "https://offline-live1.services.u-blox.com/GetOfflineData.ashx?token=${authtoken};gnss=${gnss_aid_constellations};period=1;resolution=1" -o "${aid_data_file}"
-    if [ $? -lt 0 ]
+    if [ $? -gt 0 ]
     then
         # HTTP Failed
         rm -f ${aid_data_file};
