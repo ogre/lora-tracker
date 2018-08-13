@@ -5,6 +5,7 @@ cd $source_dir
 
 gnss_aid_constellations="gps,glo" # gps=GPS, glo=GLONASS
 gnss_aid_maxage=$((3*3600)) # 3 hours
+gnss_aid_offline_maxage=$((7*24*3600)) # 7 days
 gnss_aid_ubxoffline_days=1
 
 prefix_time_aid="b562134018001000"
@@ -120,6 +121,12 @@ ubx_offline_request() {
 
     return 0;
 }
+
+# If newest data is older than gnss_aid_offline_maxage, then discard from consideration.
+if (( $((${current_timestamp} - ${newest_data})) > ${gnss_aid_offline_maxage} ));
+then
+    newest_data=0;
+fi
 
 if (( $((${current_timestamp} - ${newest_data})) > ${gnss_aid_maxage} ));
 then
