@@ -1,15 +1,16 @@
 #ifndef __GNSS_AID_H__
 #define __GNSS_AID_H__
 
-#define GNSS_AID_TIMESTAMP 0
+#ifdef GNSS_AID_ALMANAC
+  #undef GNSS_AID_ALMANAC
+#endif
 
-#define GNSS_SEND_AID_ALMANAC() \
-_delay_ms(5);
+#ifdef GNSS_AID_AUXILIARY
+  #undef GNSS_AID_AUXILIARY
+#endif
 
-#define GNSS_SEND_AID_AUXILIARY() \
-_delay_ms(5);
-
-#define GNSS_SEND_AID_UBXOFFLINE() \
-_delay_ms(5);
+#ifdef GNSS_AID_UBXOFFLINE
+  #undef GNSS_AID_UBXOFFLINE
+#endif
 
 #endif /* __GNSS_AID_H__ */
